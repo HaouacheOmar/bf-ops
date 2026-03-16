@@ -1,0 +1,90 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.pyo
+*.pyd
+*.pdb
+*.log
+*.pot
+*.mo
+*.sqlite3
+*.db
+*.db-journal
+
+# Django
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.env
+.env.*
+local_settings.py
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# Node
+node_modules/
+
+# Frontend build
+front/bFOPSSYS/dist/
+front/bFOPSSYS/.next/
+front/bFOPSSYS/.cache/
+
+# System
+Thumbs.db
+.DS_Store
+*.swp
+*.swo
+
+# Others
+*.bak
+*.tmp
+*.orig
+*.old
+.idea/
+*.iml
+
+# Coverage
+htmlcov/
+.coverage
+.tox/
+.nox/
+.coverage.*
+.cache
+.pytest_cache/
+
+# Test
+junitxml.xml
+
+# Misc
+*.pid
+*.seed
+*.cover
+*.log
+*.pot
+*.mo
+
+# Ignore database
+bfops/db.sqlite3
+
+# Ignore migrations cache
+**/__pycache__/
+**/migrations/__pycache__/
