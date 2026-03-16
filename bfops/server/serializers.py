@@ -1,5 +1,10 @@
 from rest_framework import serializers
-from .models import Assignment, Company, Job, Person, Year, Grade, Unite, TransferHistory
+from .models import Assignment, Company, Job, Person, Year, Grade, Unite, TransferHistory, UniteQuota
+class UniteQuotaSerializer(serializers.ModelSerializer):
+    unite_name = serializers.CharField(source="unite.name", read_only=True)
+    class Meta:
+        model = UniteQuota
+        fields = ["id", "year", "unite", "unite_name", "quota"]
 
 class TransferHistorySerializer(serializers.ModelSerializer):
     from_unite_name = serializers.CharField(source="from_unite.name", read_only=True)
@@ -72,17 +77,22 @@ class CompanySerializer(serializers.ModelSerializer):
         source="jobs.count",
         read_only=True
     )
+    unite = serializers.PrimaryKeyRelatedField(queryset=Unite.objects.all(), required=False, allow_null=True)
+    unite_name = serializers.CharField(source="unite.name", read_only=True)
     class Meta:
         model = Company
         fields = [
             "id",
             "name",
             "code",
+            "unite",
+            "unite_name",
             "jobs_count",
             "created_at",
         ]
 
 class YearSerializer(serializers.ModelSerializer):
+    unite_quotas = UniteQuotaSerializer(many=True, read_only=True)
     class Meta:
         model = Year
         fields = [
@@ -91,6 +101,7 @@ class YearSerializer(serializers.ModelSerializer):
             "total_quota",
             "is_closed",
             "created_at",
+            "unite_quotas",
         ]
 
 class PersonSerializer(serializers.ModelSerializer):
@@ -105,7 +116,8 @@ class PersonSerializer(serializers.ModelSerializer):
             "national_id",
             "date_of_birth",
             "hire_date",
-            "is_active",
+            "contract_type",
+            "grade",
         ]
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}"
@@ -141,3 +153,15 @@ class AssignmentSerializer(serializers.ModelSerializer):
             "year_value",
             "created_at",
         ]
+
+    def validate(self, data):
+        person = data.get('person')
+        job = data.get('job')
+        if person and job:
+            # If either grade is None, allow only if both are None
+            if job.grade_id is not None and person.grade_id is not None:
+                if job.grade_id != person.grade_id:
+                    raise serializers.ValidationError("Person's grade does not match the required grade for this job.")
+            elif job.grade_id is not None or person.grade_id is not None:
+                raise serializers.ValidationError("Person's grade does not match the required grade for this job.")
+        return data

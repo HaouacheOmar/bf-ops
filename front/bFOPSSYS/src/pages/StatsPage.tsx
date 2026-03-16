@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Box, Typography, MenuItem, Select, FormControl, InputLabel, Paper } from '@mui/material';
 import axios from 'axios';
 import { Bar, Pie } from 'react-chartjs-2';
+import { useNavigate } from 'react-router-dom';
 import Grid from '@mui/material/Grid';
 import {
   Chart as ChartJS,
@@ -16,24 +17,31 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
-interface Year { id: number; year: number; }
+
+interface Unite { id: number; name: string; }
 
 const StatsPage = () => {
+  const navigate = useNavigate();
   const [year, setYear] = useState<string>('');
   const [years, setYears] = useState<Year[]>([]);
+  const [unite, setUnite] = useState<string>('');
+  const [unites, setUnites] = useState<Unite[]>([]);
   const [jobStats, setJobStats] = useState<any[]>([]);
   const [uniteStats, setUniteStats] = useState<any[]>([]);
 
   useEffect(() => {
     axios.get('/api/years/').then(res => setYears(res.data));
+    axios.get('/api/unites/').then(res => setUnites(res.data));
   }, []);
 
   useEffect(() => {
     if (year) {
-      axios.get('/api/stats/jobs/', { params: { year_id: year } }).then(res => setJobStats(res.data));
-      axios.get('/api/stats/unites/', { params: { year_id: year } }).then(res => setUniteStats(res.data));
+      const params: any = { year_id: year };
+      if (unite) params.unite_id = unite;
+      axios.get('/api/stats/jobs/', { params }).then(res => setJobStats(res.data));
+      axios.get('/api/stats/unites/', { params }).then(res => setUniteStats(res.data));
     }
-  }, [year]);
+  }, [year, unite]);
 
   // Bar chart for job stats
   const jobBarData = {
@@ -67,6 +75,19 @@ const StatsPage = () => {
     ],
   };
 
+  // Handler for pie chart segment click
+  const handlePieClick = (event: any, elements: any) => {
+    if (!elements.length) return;
+    const idx = elements[0].index;
+    const status = ['deficit', 'balanced', 'surplus'][idx];
+    // Find first unite with that status (or show all)
+    const filtered = uniteStats.filter(u => u.status === status);
+    if (filtered.length && year) {
+      // Navigate to details for the first unite
+      navigate(`/unite-stats/${filtered[0].unite_id}/${year}`);
+    }
+  };
+
   return (
     <Box>
       <Typography variant="h4" gutterBottom>Statistics Dashboard</Typography>
@@ -75,6 +96,15 @@ const StatsPage = () => {
         <Select value={year} label="Year" onChange={e => setYear(e.target.value)}>
           {years.map(y => (
             <MenuItem key={y.id} value={y.id}>{y.year}</MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <FormControl sx={{ minWidth: 200, mb: 3, ml: 2 }}>
+        <InputLabel>Unite</InputLabel>
+        <Select value={unite} label="Unite" onChange={e => setUnite(e.target.value)}>
+          <MenuItem value="">All Unites</MenuItem>
+          {unites.map(u => (
+            <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>
           ))}
         </Select>
       </FormControl>
@@ -89,7 +119,7 @@ const StatsPage = () => {
           <Grid item xs={12} md={5}>
             <Paper sx={{ p: 2 }}>
               <Typography variant="h6">Unite Status Distribution</Typography>
-              <Pie data={unitePieData} />
+              <Pie data={unitePieData} getElementAtEvent={handlePieClick} />
             </Paper>
           </Grid>
         </Grid>

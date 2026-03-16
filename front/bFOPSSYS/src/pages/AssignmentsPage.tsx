@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import { Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button, TextField, Box, IconButton, MenuItem, Select, InputLabel, FormControl } from '@mui/material';
 import axios from 'axios';
 import EditIcon from '@mui/icons-material/Edit';
@@ -25,6 +26,8 @@ const AssignmentsPage = () => {
   const [filter, setFilter] = useState('');
   const [editing, setEditing] = useState<Assignment | null>(null);
   const [form, setForm] = useState({ person: '', job: '', year: '', contract_type: 'permanent' });
+  const [gradePopup, setGradePopup] = useState(false);
+  const [gradePopupMsg, setGradePopupMsg] = useState('');
 
   const fetchAssignments = async () => {
     const params = filter ? { search: filter } : undefined;
@@ -44,6 +47,25 @@ const AssignmentsPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Find selected person and job
+    const person = persons.find(p => String(p.id) === String(form.person));
+    const job = jobs.find(j => String(j.id) === String(form.job));
+    if (person && job) {
+      if (job.grade && person.grade !== job.grade) {
+        setGradePopupMsg("Person's grade does not match the required grade for this job.");
+        setGradePopup(true);
+        return;
+      }
+      if (job.grade && !person.grade) {
+        setGradePopupMsg("Person does not have a grade but the job requires one.");
+        setGradePopup(true);
+        return;
+      }
+      if (!job.grade && person.grade) {
+        setGradePopupMsg("Job does not require a grade but person has one. Assignment allowed.");
+        // Not blocking, just info
+      }
+    }
     if (editing) {
       await axios.put(`/api/assignments/${editing.id}/`, form);
       setEditing(null);
@@ -64,6 +86,13 @@ const AssignmentsPage = () => {
 
   return (
     <Box>
+      <Dialog open={gradePopup} onClose={() => setGradePopup(false)}>
+        <DialogTitle>Grade Mismatch</DialogTitle>
+        <DialogContent>{gradePopupMsg}</DialogContent>
+        <DialogActions>
+          <Button onClick={() => setGradePopup(false)}>OK</Button>
+        </DialogActions>
+      </Dialog>
       <Typography variant="h4" gutterBottom>Assignments</Typography>
       <Box component="form" onSubmit={handleSubmit} sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
         <FormControl sx={{ minWidth: 120 }}>

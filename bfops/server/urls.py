@@ -9,6 +9,9 @@ from .views import (
     UniteListCreateView, UniteDetailView,
     TransferHistoryListCreateView, TransferHistoryDetailView,
     JobStatsView, UniteStatsView,
+    UniteQuotaListCreateView, UniteQuotaDetailView,
+    bulk_create_persons,
+    bulk_create_jobs,
 )
 
 urlpatterns = [
@@ -17,10 +20,12 @@ urlpatterns = [
     path('companies/', CompanyListCreateView.as_view(), name='company-list-create'),
     path('companies/<int:pk>/', CompanyDetailView.as_view(), name='company-detail'),
     path('jobs/', JobListCreateView.as_view(), name='job-list-create'),
+    path('jobs/bulk_create/', bulk_create_jobs, name='job-bulk-create'),
     path('jobs/<int:pk>/', JobDetailView.as_view(), name='job-detail'),
     path('years/', YearListCreateView.as_view(), name='year-list-create'),
     path('years/<int:pk>/', YearDetailView.as_view(), name='year-detail'),
     path('persons/', PersonListCreateView.as_view(), name='person-list-create'),
+    path('persons/bulk_create/', bulk_create_persons, name='person-bulk-create'),
     path('persons/<int:pk>/', PersonDetailView.as_view(), name='person-detail'),
     path('grades/', GradeListCreateView.as_view(), name='grade-list-create'),
     path('grades/<int:pk>/', GradeDetailView.as_view(), name='grade-detail'),
@@ -35,5 +40,9 @@ urlpatterns = [
     path('job-statistics/', JobStatsView.as_view(), name='job-statistics'),
     path('service-statistics/', UniteStatsView.as_view(), name='service-statistics'),
     path('company-statistics/', UniteStatsView.as_view(), name='company-statistics'),
+
+    # UniteQuota endpoints
+    path('unite-quotas/', UniteQuotaListCreateView.as_view(), name='unitequota-list-create'),
+    path('unite-quotas/<int:pk>/', UniteQuotaDetailView.as_view(), name='unitequota-detail'),
 ]
 

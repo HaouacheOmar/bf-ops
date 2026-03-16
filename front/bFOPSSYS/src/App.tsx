@@ -3,6 +3,7 @@ import { AppBar, Toolbar, Typography, Drawer, List, ListItemText, CssBaseline, B
 import ListItemButton from '@mui/material/ListItemButton';
 import './App.css';
 
+
 import DashboardPage from './pages/DashboardPage';
 import CompaniesPage from './pages/CompaniesPage';
 import StatsPage from './pages/StatsPage';
@@ -10,6 +11,11 @@ import JobsPage from './pages/JobsPage';
 import YearsPage from './pages/YearsPage';
 import PersonsPage from './pages/PersonsPage';
 import AssignmentsPage from './pages/AssignmentsPage';
+import UniteCreatePage from './pages/UniteCreatePage';
+import GradeCreatePage from './pages/GradeCreatePage';
+import QuotaManagementPage from './pages/QuotaManagementPage';
+import UniteStatsDetailPage from './pages/UniteStatsDetailPage';
+import UniteStatsDetailPageWrapper from './pages/UniteStatsDetailPageWrapper';
 
 const drawerWidth = 220;
 const navItems = [
@@ -20,6 +26,9 @@ const navItems = [
   { label: 'Persons', path: '/persons' },
   { label: 'Assignments', path: '/assignments' },
   { label: 'Statistics', path: '/stats' },
+  { label: 'Create Unite', path: '/unites/create' },
+  { label: 'Create Grade', path: '/grades/create' },
+  { label: 'Quota Management', path: '/quota-management' },
 ];
 
 function App() {
@@ -64,6 +73,10 @@ function App() {
               <Route path="/persons" element={<PersonsPage />} />
               <Route path="/assignments" element={<AssignmentsPage />} />
               <Route path="/stats" element={<StatsPage />} />
+              <Route path="/unites/create" element={<UniteCreatePage />} />
+              <Route path="/grades/create" element={<GradeCreatePage />} />
+              <Route path="/quota-management" element={<QuotaManagementPage />} />
+              <Route path="/unite-stats/:uniteId/:yearId" element={<UniteStatsDetailPageWrapper />} />
             </Routes>
           </Container>
         </Box>

@@ -1,3 +1,40 @@
+from rest_framework.decorators import api_view
+from rest_framework import status
+# Bulk create endpoint for jobs
+@api_view(["POST"])
+def bulk_create_jobs(request):
+	if not isinstance(request.data, list):
+		return Response({"error": "Expected a list of objects."}, status=status.HTTP_400_BAD_REQUEST)
+	from .serializers import JobSerializer
+	serializer = JobSerializer(data=request.data, many=True)
+	if serializer.is_valid():
+		serializer.save()
+		return Response(serializer.data, status=status.HTTP_201_CREATED)
+	return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+from rest_framework.decorators import api_view
+from rest_framework import status
+# Bulk create endpoint for persons
+@api_view(["POST"])
+def bulk_create_persons(request):
+	if not isinstance(request.data, list):
+		return Response({"error": "Expected a list of objects."}, status=status.HTTP_400_BAD_REQUEST)
+	serializer = PersonSerializer(data=request.data, many=True)
+	if serializer.is_valid():
+		serializer.save()
+		return Response(serializer.data, status=status.HTTP_201_CREATED)
+	return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+from rest_framework import generics
+from .models import Assignment, Company, Job, Year, Person, Grade, Unite, UniteQuota
+from .serializers import AssignmentSerializer, CompanySerializer, JobSerializer, YearSerializer, PersonSerializer, GradeSerializer, UniteSerializer, UniteQuotaSerializer
+# List/Create:   /api/unite-quotas/   (GET, POST)
+# Detail:        /api/unite-quotas/<id>/   (GET, PUT, PATCH, DELETE)
+class UniteQuotaListCreateView(generics.ListCreateAPIView):
+	queryset = UniteQuota.objects.select_related("year", "unite").all()
+	serializer_class = UniteQuotaSerializer
+
+class UniteQuotaDetailView(generics.RetrieveUpdateDestroyAPIView):
+	queryset = UniteQuota.objects.all()
+	serializer_class = UniteQuotaSerializer
 # --- Required imports for DRF generics and filters ---
 from rest_framework import generics, filters
 from django_filters.rest_framework import DjangoFilterBackend

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button, TextField, Box, IconButton } from '@mui/material';
+import { MenuItem } from '@mui/material';
 import axios from 'axios';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -19,7 +20,8 @@ const CompaniesPage = () => {
   const safeCompanies = Array.isArray(companies) ? companies : [];
   const [filter, setFilter] = useState('');
   const [editing, setEditing] = useState<Company | null>(null);
-  const [form, setForm] = useState({ name: '', code: '' });
+  const [form, setForm] = useState({ name: '', code: '', unite: '' });
+  const [unites, setUnites] = useState<{ id: number; name: string }[]>([]);
 
   const fetchCompanies = async () => {
     const params = filter ? { search: filter } : undefined;
@@ -29,6 +31,7 @@ const CompaniesPage = () => {
 
   useEffect(() => {
     fetchCompanies();
+    axios.get('/api/unites/').then(res => setUnites(res.data));
     // eslint-disable-next-line
   }, [filter]);
 
@@ -40,13 +43,13 @@ const CompaniesPage = () => {
     } else {
       await axios.post('/api/companies/', form);
     }
-    setForm({ name: '', code: '' });
+    setForm({ name: '', code: '', unite: '' });
     fetchCompanies();
   };
 
   const handleEdit = (company: Company) => {
     setEditing(company);
-    setForm({ name: company.name, code: company.code });
+    setForm({ name: company.name, code: company.code, unite: company.unite || '' });
   };
 
   const handleDelete = async (id: number) => {
@@ -72,6 +75,16 @@ const CompaniesPage = () => {
           onChange={e => setForm(f => ({ ...f, code: e.target.value }))}
           required
         />
+        <TextField
+          select
+          label="Unite"
+          value={form.unite}
+          onChange={e => setForm(f => ({ ...f, unite: e.target.value }))}
+          required
+        >
+          <MenuItem value="">Select unite</MenuItem>
+          {unites.map(u => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
+        </TextField>
         <Button type="submit" variant="contained" color="primary">
           {editing ? 'Update' : 'Add'}
         </Button>
