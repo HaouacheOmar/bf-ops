@@ -16,6 +16,7 @@ import GradeCreatePage from './pages/GradeCreatePage';
 import QuotaManagementPage from './pages/QuotaManagementPage';
 import UniteStatsDetailPage from './pages/UniteStatsDetailPage';
 import UniteStatsDetailPageWrapper from './pages/UniteStatsDetailPageWrapper';
+import UniteStatsDetailByStatusPage from './pages/UniteStatsDetailByStatusPage';
 
 const drawerWidth = 220;
 const navItems = [
@@ -77,6 +78,7 @@ function App() {
               <Route path="/grades/create" element={<GradeCreatePage />} />
               <Route path="/quota-management" element={<QuotaManagementPage />} />
               <Route path="/unite-stats/:uniteId/:yearId" element={<UniteStatsDetailPageWrapper />} />
+              <Route path="/unite-stats-detail-by-status/:status/:year" element={<UniteStatsDetailByStatusPage />} />
             </Routes>
           </Container>
         </Box>

@@ -5,30 +5,26 @@ def job_statistics(year_id):
     """
     Returns a list of job stats for the given year, including deficit/surplus/balanced status.
     """
-    queryset = (
+    # Get all jobs for the year (by unite if needed)
+    jobs = Job.objects.select_related("company__unite").all()
+    # Get assignment counts per job for the year
+    job_counts = dict(
         Assignment.objects
         .filter(year_id=year_id)
-        .values(
-            "job_id",
-            "job__name",
-            "job__max_workers",
-            "job__company__unite_id",
-            "job__company__unite__name",
-        )
-        .annotate(current_workers=Count("id"))
+        .values_list("job_id")
+        .annotate(count=Count("id"))
     )
-
     results = []
-    for row in queryset:
-        max_workers = row["job__max_workers"]
-        current = row["current_workers"]
+    for job in jobs:
+        current = job_counts.get(job.id, 0)
+        max_workers = job.max_workers
         difference = current - max_workers
         percentage = (difference / max_workers * 100) if max_workers > 0 else 0
         results.append({
-            "job_id": row["job_id"],
-            "job_name": row["job__name"],
-            "unite_id": row["job__company__unite_id"],
-            "unite_name": row["job__company__unite__name"],
+            "job_id": job.id,
+            "job_name": job.name,
+            "unite_id": job.company.unite_id if job.company else None,
+            "unite_name": job.company.unite.name if job.company and job.company.unite else None,
             "current_workers": current,
             "max_workers": max_workers,
             "difference": difference,

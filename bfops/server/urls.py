@@ -36,12 +36,10 @@ urlpatterns = [
     path('stats/jobs/', JobStatsView.as_view(), name='job-stats'),
     path('stats/unites/', UniteStatsView.as_view(), name='unite-stats'),
 
-    # Add endpoints to match frontend
     path('job-statistics/', JobStatsView.as_view(), name='job-statistics'),
     path('service-statistics/', UniteStatsView.as_view(), name='service-statistics'),
     path('company-statistics/', UniteStatsView.as_view(), name='company-statistics'),
 
-    # UniteQuota endpoints
     path('unite-quotas/', UniteQuotaListCreateView.as_view(), name='unitequota-list-create'),
     path('unite-quotas/<int:pk>/', UniteQuotaDetailView.as_view(), name='unitequota-detail'),
 ]
