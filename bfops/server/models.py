@@ -49,13 +49,11 @@ class Job(models.Model):
         on_delete=models.CASCADE,
         related_name="jobs"
     )
-    grade = models.ForeignKey(
-        Grade,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="jobs"
-    )
+    grades = models.ManyToManyField(
+            Grade,
+            blank=True,
+            related_name="jobs"
+        )
     max_workers = models.PositiveIntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -64,9 +62,6 @@ class Job(models.Model):
 
     def __str__(self):
         return self.name
-    
-
-
 
 
 class Year(models.Model):
@@ -93,12 +88,12 @@ class UniteQuota(models.Model):
 
     def __str__(self):
         return f"{self.year.year} - {self.unite.name}: {self.quota}"
-    
+
 
 class Person(models.Model):
     first_name = models.CharField(max_length=150)
     last_name = models.CharField(max_length=150)
-    national_id = models.CharField(max_length=50, unique=True)
+    national_id = models.CharField(max_length=50, unique=True) # Assuming this acts as 'matricule'
     grade = models.ForeignKey(
         Grade,
         on_delete=models.SET_NULL,
@@ -106,8 +101,27 @@ class Person(models.Model):
         blank=True,
         related_name="persons"
     )
-    date_of_birth = models.DateField(null=True, blank=True)
-    hire_date = models.DateField(null=True, blank=True)
+    unite = models.ForeignKey(
+        Unite,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="persons"
+    )
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="persons"
+    )
+    job = models.ForeignKey(
+        Job,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="persons"
+    )
     contract_type = models.CharField(
         max_length=20,
         choices=(
@@ -140,15 +154,6 @@ class Assignment(models.Model):
         on_delete=models.CASCADE,
         related_name="assignments"
     )
-    contract_type = models.CharField(
-        max_length=50,
-        choices=(
-            ("permanent", "Permanent"),
-            ("temporary", "Temporary"),
-            ("intern", "Intern"),
-        ),
-        default="permanent"
-    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -159,7 +164,6 @@ class Assignment(models.Model):
 
     def __str__(self):
         return f"{self.person} - {self.job} - {self.year}"
-    
 
 
 class TransferHistory(models.Model):
@@ -191,3 +195,30 @@ class TransferHistory(models.Model):
 
     def __str__(self):
         return f"{self.assignment.person} moved"
+
+
+class Gain(models.Model):
+    person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="gains")
+    year = models.ForeignKey(Year, on_delete=models.CASCADE, related_name="gains")
+    unite = models.ForeignKey(Unite, on_delete=models.SET_NULL, null=True, blank=True, related_name="gains")
+    company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name="gains")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Gain: {self.person} - {self.unite.name if self.unite else 'N/A'}"
+
+class Loss(models.Model):
+    person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="losses")
+    year = models.ForeignKey(Year, on_delete=models.CASCADE, related_name="losses")
+    unite = models.ForeignKey(Unite, on_delete=models.SET_NULL, null=True, blank=True, related_name="losses")
+    company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name="losses")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Loss: {self.person} - {self.unite.name if self.unite else 'N/A'}"

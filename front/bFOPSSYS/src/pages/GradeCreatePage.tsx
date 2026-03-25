@@ -1,113 +1,144 @@
 import React, { useState, useEffect } from 'react';
-import { TextField, Button, Box, Typography, Paper, Container, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton } from '@mui/material';
-import { createGrade, api } from '../api';
+import { api } from '../api'; // Swapped out createGrade to use api directly
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import StarIcon from '@mui/icons-material/Star';
+import '../styles/layout.css';
 
 const GradeCreatePage: React.FC = () => {
-  const [name, setName] = useState('');
-  const [code, setCode] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [grades, setGrades] = useState<any[]>([]);
+  const [error, setError] = useState('');
+  
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
+  const [form, setForm] = useState({ name: '', code: '' });
 
   const fetchGrades = async () => {
     const res = await api.get('/grades/');
-    setGrades(res.data);
+    setGrades(res.data.results || res.data);
   };
+  
   useEffect(() => { fetchGrades(); }, []);
+
+  const openNewForm = () => {
+    setEditing(null);
+    setForm({ name: '', code: '' });
+    setError('');
+    setIsFormOpen(true);
+  };
+
+  const closeForm = () => {
+    setIsFormOpen(false);
+    setEditing(null);
+    setError('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setSuccess('');
     try {
       if (editing) {
-        await api.put(`/grades/${editing.id}/`, { name, code });
-        setEditing(null);
-        setSuccess('Grade updated successfully!');
+        // OPTIMISTIC UPDATE
+        const res = await api.put(`/grades/${editing.id}/`, form);
+        setGrades(grades.map(g => g.id === editing.id ? res.data : g));
       } else {
-        await createGrade({ name, code });
-        setSuccess('Grade created successfully!');
+        // OPTIMISTIC UPDATE
+        const res = await api.post('/grades/', form);
+        setGrades([...grades, res.data]);
       }
-      setName('');
-      setCode('');
-      fetchGrades();
+      closeForm();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Error creating grade');
+      setError(err?.response?.data?.detail || 'Error saving grade');
     }
   };
 
   const handleEdit = (grade: any) => {
     setEditing(grade);
-    setName(grade.name);
-    setCode(grade.code);
+    setForm({ name: grade.name, code: grade.code });
+    setError('');
+    setIsFormOpen(true);
   };
+
   const handleDelete = async (id: number) => {
-    await api.delete(`/grades/${id}/`);
-    fetchGrades();
+    if(window.confirm("Delete this grade?")) {
+      await api.delete(`/grades/${id}/`);
+      // OPTIMISTIC UPDATE
+      setGrades(grades.filter(g => g.id !== id));
+    }
   };
 
   return (
-    <Container maxWidth="sm">
-      <Paper sx={{ p: 3, mt: 4 }}>
-        <Typography variant="h5" gutterBottom>
-          Create Grade
-        </Typography>
-        <Box component="form" onSubmit={handleSubmit}>
-          <TextField
-            label="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            fullWidth
-            margin="normal"
-            required
-          />
-          <TextField
-            label="Code"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            fullWidth
-            margin="normal"
-            required
-          />
-          {error && <Typography color="error">{error}</Typography>}
-          {success && <Typography color="primary">{success}</Typography>}
-          <Button type="submit" variant="contained" color="primary" sx={{ mt: 2 }}>
-            {editing ? 'Update' : 'Create'}
-          </Button>
-          {editing && <Button onClick={() => { setEditing(null); setName(''); setCode(''); }} color="secondary" sx={{ mt: 2, ml: 2 }}>Cancel</Button>}
-        </Box>
-        <Box sx={{ mt: 4 }}>
-          <Typography variant="h6">Grades List</Typography>
-          <TableContainer component={Paper} sx={{ mt: 2 }}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Code</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {grades.map((grade) => (
-                  <TableRow key={grade.id}>
-                    <TableCell>{grade.name}</TableCell>
-                    <TableCell>{grade.code}</TableCell>
-                    <TableCell>
-                      <IconButton onClick={() => handleEdit(grade)}><EditIcon /></IconButton>
-                      <IconButton onClick={() => handleDelete(grade.id)} color="error"><DeleteIcon /></IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Box>
-      </Paper>
-    </Container>
+    <div className="assignments-page-container">
+      <header className="page-header">
+        <div className="page-title">
+          <h1>Employee Grades</h1>
+          <span className="breadcrumb">Settings &gt; <span className="breadcrumb-active">Grades Dictionary</span></span>
+        </div>
+      </header>
+
+      <div className="top-grid" style={{gridTemplateColumns: '300px'}}>
+        <div className="card">
+          <h2 className="card-title">New Grade</h2>
+          <p className="card-subtitle">Define a new employee seniority grade.</p>
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={openNewForm}>
+            <StarIcon fontSize="small" /> Add Grade
+          </button>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="table-header-row">
+          <h2 className="card-title" style={{marginBottom: '4px'}}>Grades Dictionary</h2>
+        </div>
+
+        <table className="custom-table">
+          <thead>
+            <tr>
+              <th>Grade Name</th>
+              <th>Reference Code</th>
+              <th style={{ width: '100px' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {grades.map((grade) => (
+              <tr key={grade.id}>
+                <td><strong>{grade.name}</strong></td>
+                <td><span className="status-pill blue">{grade.code}</span></td>
+                <td>
+                  <div className="action-icons">
+                    <button className="action-btn edit" onClick={() => handleEdit(grade)}><EditIcon fontSize="small" /></button>
+                    <button className="action-btn delete" onClick={() => handleDelete(grade.id)}><DeleteIcon fontSize="small" /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {isFormOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2 style={{marginTop: 0, marginBottom: '24px'}}>{editing ? 'Edit Grade' : 'Create Grade'}</h2>
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label>Grade Name</label>
+                <input type="text" className="filter-select" value={form.name} onChange={(e) => setForm({...form, name: e.target.value})} required />
+              </div>
+              <div className="form-group">
+                <label>Grade Code</label>
+                <input type="text" className="filter-select" value={form.code} onChange={(e) => setForm({...form, code: e.target.value})} required />
+              </div>
+              {error && <p style={{ color: '#ef4444', fontSize: '12px' }}>{error}</p>}
+              <div className="modal-actions">
+                <button type="button" className="btn btn-outline" onClick={closeForm}>Cancel</button>
+                <button type="submit" className="btn btn-primary">{editing ? 'Update' : 'Save'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
-
 export default GradeCreatePage;

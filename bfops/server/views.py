@@ -1,195 +1,208 @@
-from rest_framework.decorators import api_view
-from rest_framework import status
-from rest_framework import generics, filters
-from django_filters.rest_framework import DjangoFilterBackend
-from .models import TransferHistory
-from .serializers import TransferHistorySerializer
-from rest_framework import generics, filters
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from django_filters.rest_framework import DjangoFilterBackend
+from urllib.parse import urlencode
 from django.core.cache import cache
-
-from .models import Assignment, Company, Job, Year, Person, Grade, Unite
-from .serializers import AssignmentSerializer, CompanySerializer, JobSerializer, YearSerializer, PersonSerializer, GradeSerializer, UniteSerializer
-
-
-@api_view(["POST"])
-def bulk_create_jobs(request):
-	if not isinstance(request.data, list):
-		return Response({"error": "Expected a list of objects."}, status=status.HTTP_400_BAD_REQUEST)
-	from .serializers import JobSerializer
-	serializer = JobSerializer(data=request.data, many=True)
-	if serializer.is_valid():
-		serializer.save()
-		return Response(serializer.data, status=status.HTTP_201_CREATED)
-	return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(["POST"])
-def bulk_create_persons(request):
-	if not isinstance(request.data, list):
-		return Response({"error": "Expected a list of objects."}, status=status.HTTP_400_BAD_REQUEST)
-	serializer = PersonSerializer(data=request.data, many=True)
-	if serializer.is_valid():
-		serializer.save()
-		return Response(serializer.data, status=status.HTTP_201_CREATED)
-	return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-from rest_framework import generics
-from .models import Assignment, Company, Job, Year, Person, Grade, Unite, UniteQuota
-from .serializers import AssignmentSerializer, CompanySerializer, JobSerializer, YearSerializer, PersonSerializer, GradeSerializer, UniteSerializer, UniteQuotaSerializer
-
-class UniteQuotaListCreateView(generics.ListCreateAPIView):
-	queryset = UniteQuota.objects.select_related("year", "unite").all()
-	serializer_class = UniteQuotaSerializer
-
-class UniteQuotaDetailView(generics.RetrieveUpdateDestroyAPIView):
-	queryset = UniteQuota.objects.all()
-	serializer_class = UniteQuotaSerializer
-
-# List/Create:   /api/transfers/   (GET, POST)
-# Detail:        /api/transfers/<id>/   (GET, PUT, PATCH, DELETE)
-class TransferHistoryListCreateView(generics.ListCreateAPIView):
-	queryset = TransferHistory.objects.select_related("assignment", "from_unite", "to_unite").all()
-	serializer_class = TransferHistorySerializer
-	filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-	filterset_fields = {
-		'assignment': ['exact'],
-		'assignment__person': ['exact'],
-		'assignment__job': ['exact'],
-		'assignment__year': ['exact'],
-		'from_unite': ['exact'],
-		'to_unite': ['exact'],
-	}
-	search_fields = ['reason']
-	ordering_fields = ['transfer_date', 'from_unite', 'to_unite']
-
-class TransferHistoryDetailView(generics.RetrieveUpdateDestroyAPIView):
-	queryset = TransferHistory.objects.all()
-	serializer_class = TransferHistorySerializer
-from rest_framework.views import APIView
+from django.db import transaction
+from rest_framework import viewsets, filters, status
+from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
-from .services.stats import job_statistics, unite_statistics
+from rest_framework.views import APIView
+from django_filters.rest_framework import DjangoFilterBackend
+
+from .models import Assignment, Company, Job, Year, Person, Grade, Unite, Gain, Loss, TransferHistory, UniteQuota
+from .serializers import (
+    AssignmentSerializer, CompanySerializer, JobSerializer, YearSerializer, 
+    PersonSerializer, GradeSerializer, UniteSerializer, UniteQuotaSerializer,
+    TransferHistorySerializer, GainSerializer, LossSerializer
+)
+from .services.stats import company_statistics, job_statistics, unite_statistics
+
 # --- Statistics API ---
 class JobStatsView(APIView):
-	def get(self, request):
-		year_id = request.query_params.get('year_id')
-		if not year_id:
-			return Response({"error": "year_id is required"}, status=400)
-		stats = job_statistics(year_id)
-		return Response(stats)
+    def get(self, request):
+        year_id = request.query_params.get('year_id')
+        if not year_id:
+            return Response({"error": "year_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(job_statistics(year_id))
 
 class UniteStatsView(APIView):
-	def get(self, request):
-		year_id = request.query_params.get('year_id')
-		if not year_id:
-			return Response({"error": "year_id is required"}, status=400)
-		stats = unite_statistics(year_id)
-		return Response(stats)
+    def get(self, request):
+        year_id = request.query_params.get('year_id')
+        if not year_id:
+            return Response({"error": "year_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(unite_statistics(year_id))
 
+@api_view(['GET'])
+def company_stats_view(request):
+    year_id = request.GET.get('year_id')
+    if not year_id:
+        return Response({"error": "year_id parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    stats = company_statistics(year_id)
+    
+    unite_id = request.GET.get('unite_id')
+    company_id = request.GET.get('company_id')
+    
+    if unite_id:
+        stats = [s for s in stats if str(s.get('unite_id')) == str(unite_id)]
+    if company_id:
+        stats = [s for s in stats if str(s.get('company_id')) == str(company_id)]
+        
+    return Response({"results": stats})
 
+# --- Main ViewSets ---
+class UniteQuotaViewSet(viewsets.ModelViewSet):
+    queryset = UniteQuota.objects.select_related("year", "unite").all()
+    serializer_class = UniteQuotaSerializer
 
+class TransferHistoryViewSet(viewsets.ModelViewSet):
+    queryset = TransferHistory.objects.select_related("assignment", "from_unite", "to_unite").all()
+    serializer_class = TransferHistorySerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = {
+        'assignment': ['exact'], 'assignment__person': ['exact'], 'assignment__job': ['exact'],
+        'assignment__year': ['exact'], 'from_unite': ['exact'], 'to_unite': ['exact'],
+    }
+    search_fields = ['reason']
+    ordering_fields = ['transfer_date', 'from_unite', 'to_unite']
 
-# List/Create:   /api/assignments/   (GET, POST)
-# Detail:        /api/assignments/<id>/   (GET, PUT, PATCH, DELETE)
-class AssignmentListCreateView(generics.ListCreateAPIView):
-	queryset = Assignment.objects.select_related(
-		"person", "job", "year"
-	).all()
-	serializer_class = AssignmentSerializer
-	filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-	filterset_fields = {
-		'job': ['exact'],
-		'year': ['exact'],
-		'person': ['exact'],
-		'contract_type': ['exact'],
-	}
-	search_fields = ['person__first_name', 'person__last_name', 'job__name']
-	ordering_fields = ['created_at', 'year', 'job']
-class GradeListCreateView(generics.ListCreateAPIView):
-	queryset = Grade.objects.all()
-	serializer_class = GradeSerializer
-	filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-	search_fields = ['name', 'code']
-	ordering_fields = ['name', 'created_at']
+class AssignmentViewSet(viewsets.ModelViewSet):
+    queryset = Assignment.objects.select_related("person", "job", "year").all()
+    serializer_class = AssignmentSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['job', 'year', 'person', 'person__contract_type']
+    search_fields = ['person__first_name', 'person__last_name', 'job__name']
+    ordering_fields = ['created_at', 'year', 'job']
 
-class GradeDetailView(generics.RetrieveUpdateDestroyAPIView):
-	queryset = Grade.objects.all()
-	serializer_class = GradeSerializer
+    def perform_create(self, serializer):
+        assignment = serializer.save()
+        job = assignment.job
+        Gain.objects.create(person=assignment.person, year=assignment.year, unite=job.company.unite if job.company else None, company=job.company)
 
-class UniteListCreateView(generics.ListCreateAPIView):
-	queryset = Unite.objects.all()
-	serializer_class = UniteSerializer
-	filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-	search_fields = ['name', 'code']
-	ordering_fields = ['name', 'created_at']
+    def perform_destroy(self, instance):
+        job = instance.job
+        Loss.objects.create(person=instance.person, year=instance.year, unite=job.company.unite if job.company else None, company=job.company)
+        instance.delete()
 
-class UniteDetailView(generics.RetrieveUpdateDestroyAPIView):
-	queryset = Unite.objects.all()
-	serializer_class = UniteSerializer
+class GradeViewSet(viewsets.ModelViewSet):
+    queryset = Grade.objects.all()
+    serializer_class = GradeSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'code']
+    ordering_fields = ['name', 'created_at']
 
-	def list(self, request, *args, **kwargs):
-		key = f"assignments:{hash(frozenset(request.query_params.items()))}"
-		data = cache.get(key)
-		if data is None:
-			response = super().list(request, *args, **kwargs)
-			cache.set(key, response.data, timeout=60)
-			return response
-		return Response(data)
+class UniteViewSet(viewsets.ModelViewSet):
+    queryset = Unite.objects.all()
+    serializer_class = UniteSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'code']
+    ordering_fields = ['name', 'created_at']
 
+    def list(self, request, *args, **kwargs):
+        # FIX: Use urlencode with sorted parameters for a stable cache key
+        query_string = urlencode(sorted(request.query_params.items()))
+        key = f"unites:{query_string}"
+        
+        data = cache.get(key)
+        if data is None:
+            response = super().list(request, *args, **kwargs)
+            cache.set(key, response.data, timeout=60)
+            return response
+        return Response(data)
 
-class AssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
-	queryset = Assignment.objects.all()
-	serializer_class = AssignmentSerializer
+class CompanyViewSet(viewsets.ModelViewSet):
+    queryset = Company.objects.all()
+    serializer_class = CompanySerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'code']
+    ordering_fields = ['name', 'created_at']
 
-# List/Create:   /api/companies/   (GET, POST)
-# Detail:        /api/companies/<id>/   (GET, PUT, PATCH, DELETE)
-class CompanyListCreateView(generics.ListCreateAPIView):
-	queryset = Company.objects.all()
-	serializer_class = CompanySerializer
-	filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-	search_fields = ['name', 'code']
-	ordering_fields = ['name', 'created_at']
+class JobViewSet(viewsets.ModelViewSet):
+    queryset = Job.objects.all()
+    serializer_class = JobSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'code']
+    ordering_fields = ['name', 'created_at']
 
-class CompanyDetailView(generics.RetrieveUpdateDestroyAPIView):
-	queryset = Company.objects.all()
-	serializer_class = CompanySerializer
+    @action(detail=False, methods=['post'])
+    def bulk_create(self, request):
+        if not isinstance(request.data, list):
+            return Response({"error": "Expected a list of objects."}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(data=request.data, many=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+class YearViewSet(viewsets.ModelViewSet):
+    queryset = Year.objects.all()
+    serializer_class = YearSerializer
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['year', 'created_at']
 
+class PersonViewSet(viewsets.ModelViewSet):
+    queryset = Person.objects.all()
+    serializer_class = PersonSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['first_name', 'last_name', 'national_id']
+    ordering_fields = ['last_name', 'first_name', 'created_at']
 
-# List/Create:   /api/jobs/   (GET, POST)
-# Detail:        /api/jobs/<id>/   (GET, PUT, PATCH, DELETE)
-class JobListCreateView(generics.ListCreateAPIView):
-	queryset = Job.objects.all()
-	serializer_class = JobSerializer
-	filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-	search_fields = ['name', 'code']
-	ordering_fields = ['name', 'created_at']
+    @action(detail=False, methods=['post'])
+    def bulk_create(self, request):
+        if not isinstance(request.data, list):
+            return Response({"error": "Expected a list of objects."}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(data=request.data, many=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class JobDetailView(generics.RetrieveUpdateDestroyAPIView):
-	queryset = Job.objects.all()
-	serializer_class = JobSerializer
+# Gain/Loss views only need Read-Only access 
+class GainViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Gain.objects.select_related("person", "unite", "company", "year").all()
+    serializer_class = GainSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['unite', 'company', 'year']
 
-# List/Create:   /api/years/   (GET, POST)
-# Detail:        /api/years/<id>/   (GET, PUT, PATCH, DELETE)
-class YearListCreateView(generics.ListCreateAPIView):
-	queryset = Year.objects.all()
-	serializer_class = YearSerializer
-	filter_backends = [filters.OrderingFilter]
-	ordering_fields = ['year', 'created_at']
+class LossViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Loss.objects.select_related("person", "unite", "company", "year").all()
+    serializer_class = LossSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['unite', 'company', 'year']
 
-class YearDetailView(generics.RetrieveUpdateDestroyAPIView):
-	queryset = Year.objects.all()
-	serializer_class = YearSerializer
+# --- Custom Actions ---
+@api_view(['POST'])
+@transaction.atomic
+def execute_transfer(request):
+    assignment_id = request.data.get('assignment_id')
+    new_unite_id = request.data.get('new_unite_id')
+    reason = request.data.get('reason', 'Transfert Unité')
 
-# List/Create:   /api/persons/   (GET, POST)
-# Detail:        /api/persons/<id>/   (GET, PUT, PATCH, DELETE)
-class PersonListCreateView(generics.ListCreateAPIView):
-	queryset = Person.objects.all()
-	serializer_class = PersonSerializer
-	filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-	search_fields = ['first_name', 'last_name', 'national_id']
-	ordering_fields = ['last_name', 'first_name', 'created_at']
+    try:
+        assignment = Assignment.objects.select_related('job__company__unite').get(id=assignment_id)
+        new_unite = Unite.objects.get(id=new_unite_id)
+    except (Assignment.DoesNotExist, Unite.DoesNotExist):
+        return Response({"error": "Assignment or Destination Unite not found."}, status=status.HTTP_404_NOT_FOUND)
 
-class PersonDetailView(generics.RetrieveUpdateDestroyAPIView):
-	queryset = Person.objects.all()
-	serializer_class = PersonSerializer
+    old_job = assignment.job
+    old_company = old_job.company
+    old_unite = old_company.unite
+
+    if old_unite == new_unite:
+        return Response({"error": "Le travailleur est déjà dans cette unité."}, status=status.HTTP_400_BAD_REQUEST)
+
+    pool_company, _ = Company.objects.get_or_create(
+        unite=new_unite, name=f"Pool - {new_unite.name}", defaults={"code": f"POOL-{new_unite.code}"}
+    )
+    
+    pending_job, _ = Job.objects.get_or_create(
+        company=pool_company, name="En attente d'affectation", defaults={"code": f"ATT-{new_unite.code}", "max_workers": 999}
+    )
+
+    Loss.objects.create(person=assignment.person, year=assignment.year, unite=old_unite, company=old_company)
+    Gain.objects.create(person=assignment.person, year=assignment.year, unite=new_unite, company=pool_company)
+    
+    TransferHistory.objects.create(assignment=assignment, from_unite=old_unite, to_unite=new_unite, reason=reason)
+
+    assignment.job = pending_job
+    assignment.save()
+
+    return Response({"message": f"Transfert réussi vers l'unité {new_unite.name}."}, status=status.HTTP_200_OK)
