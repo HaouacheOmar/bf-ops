@@ -175,6 +175,8 @@ class LossViewSet(viewsets.ReadOnlyModelViewSet):
 def execute_transfer(request):
     assignment_id = request.data.get('assignment_id')
     new_unite_id = request.data.get('new_unite_id')
+    new_company_id = request.data.get('new_company_id')
+    new_job_id = request.data.get('new_job_id')
     reason = request.data.get('reason', 'Transfert Unité')
 
     try:
@@ -190,20 +192,61 @@ def execute_transfer(request):
     if old_unite == new_unite:
         return Response({"error": "Le travailleur est déjà dans cette unité."}, status=status.HTTP_400_BAD_REQUEST)
 
-    pool_company, _ = Company.objects.get_or_create(
-        unite=new_unite, name=f"Pool - {new_unite.name}", defaults={"code": f"POOL-{new_unite.code}"}
-    )
-    
-    pending_job, _ = Job.objects.get_or_create(
-        company=pool_company, name="En attente d'affectation", defaults={"code": f"ATT-{new_unite.code}", "max_workers": 999}
-    )
+    destination_company = None
+    destination_job = None
+
+    if new_company_id:
+        try:
+            destination_company = Company.objects.get(id=new_company_id)
+        except Company.DoesNotExist:
+            return Response({"error": "Destination company not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if destination_company.unite_id != new_unite.id:
+            return Response(
+                {"error": "Selected company does not belong to the destination unite."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    if new_job_id:
+        try:
+            destination_job = Job.objects.select_related("company").get(id=new_job_id)
+        except Job.DoesNotExist:
+            return Response({"error": "Destination job not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if destination_job.company.unite_id != new_unite.id:
+            return Response(
+                {"error": "Selected job is not linked to the destination unite."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if destination_company and destination_job.company_id != destination_company.id:
+            return Response(
+                {"error": "Selected job is not linked to the selected company."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        destination_company = destination_job.company
+
+    if not destination_company:
+        destination_company, _ = Company.objects.get_or_create(
+            unite=new_unite,
+            name=f"Pool - {new_unite.name}",
+            defaults={"code": f"POOL-{new_unite.code}"},
+        )
+
+    if not destination_job:
+        destination_job, _ = Job.objects.get_or_create(
+            company=destination_company,
+            name="En attente d'affectation",
+            defaults={"code": f"ATT-{new_unite.code}", "max_workers": 999},
+        )
 
     Loss.objects.create(person=assignment.person, year=assignment.year, unite=old_unite, company=old_company)
-    Gain.objects.create(person=assignment.person, year=assignment.year, unite=new_unite, company=pool_company)
+    Gain.objects.create(person=assignment.person, year=assignment.year, unite=new_unite, company=destination_company)
     
     TransferHistory.objects.create(assignment=assignment, from_unite=old_unite, to_unite=new_unite, reason=reason)
 
-    assignment.job = pending_job
+    assignment.job = destination_job
     assignment.save()
 
     return Response({"message": f"Transfert réussi vers l'unité {new_unite.name}."}, status=status.HTTP_200_OK)

@@ -271,14 +271,14 @@ const DashboardPage = () => {
         <>
           {/* JOB CHARTS */}
           <Grid container spacing={3}>
-            <Grid item xs={12} md={7}>
+            <Grid size={{ xs: 12, md: 7 }}>
               <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%' }}>
                 <Typography variant="h6" fontWeight="medium" mb={3}>Job Capacity vs. Actual</Typography>
                 <Bar data={jobBarData} options={{ responsive: true, plugins: { legend: { position: 'top' } } }} />
               </Paper>
             </Grid>
             
-            <Grid item xs={12} md={5}>
+            <Grid size={{ xs: 12, md: 5 }}>
               <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <Typography variant="h6" fontWeight="medium" mb={3}>Job Status Breakdown</Typography>
                 <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -291,7 +291,7 @@ const DashboardPage = () => {
           {/* COMPANY CHARTS */}
           {companyStats.length > 0 && (
             <Grid container spacing={3} sx={{ mt: 2 }}>
-              <Grid item xs={12} md={7}>
+              <Grid size={{ xs: 12, md: 7 }}>
                 <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%' }}>
                   <Typography variant="h6" fontWeight="medium" mb={3}>
                     Company Capacity vs. Actual
@@ -300,7 +300,7 @@ const DashboardPage = () => {
                 </Paper>
               </Grid>
 
-              <Grid item xs={12} md={5}>
+              <Grid size={{ xs: 12, md: 5 }}>
                 <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
                   <Typography variant="h6" fontWeight="medium" mb={3}>
                     Company Status Breakdown

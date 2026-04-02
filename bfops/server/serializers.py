@@ -138,6 +138,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
     person_name = serializers.CharField(source="person.__str__", read_only=True)
     job_name = serializers.CharField(source="job.name", read_only=True)
     company_name = serializers.CharField(source="job.company.name", read_only=True)
+    unite_id = serializers.IntegerField(source="job.company.unite.id", read_only=True)
     unite_name = serializers.CharField(
         source="job.company.unite.name",
         read_only=True,
@@ -155,6 +156,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
             "person_name",
             "job_name",
             "company_name",
+            "unite_id",
             "unite_name",
             "year_value",
             "created_at",
