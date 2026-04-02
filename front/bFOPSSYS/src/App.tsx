@@ -25,7 +25,6 @@ import LogoutIcon from '@mui/icons-material/Logout';
 // --- Page Imports ---
 import DashboardPage from './pages/DashboardPage';
 import CompaniesPage from './pages/CompaniesPage';
-import StatsPage from './pages/StatsPage';
 import JobsPage from './pages/JobsPage';
 import YearsPage from './pages/YearsPage';
 import PersonsPage from './pages/PersonsPage';
@@ -87,9 +86,10 @@ function AppLayout() {
             width: drawerWidth, 
             boxSizing: 'border-box',
             backgroundColor: '#ffffff',
-            borderRight: '1px solid #e2e8f0', // Soft gray border
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            borderRight: 'none'
           },
         }}
       >
@@ -198,7 +198,7 @@ function AppLayout() {
             <Route path="/years" element={<YearsPage />} />
             <Route path="/persons" element={<PersonsPage />} />
             <Route path="/assignments" element={<AssignmentsPage />} />
-            <Route path="/stats" element={<StatsPage />} />
+            <Route path="/stats" element={<DashboardPage />} />
             <Route path="/unites/create" element={<UniteCreatePage />} />
             <Route path="/grades/create" element={<GradeCreatePage />} />
             <Route path="/quota-management" element={<QuotaManagementPage />} />

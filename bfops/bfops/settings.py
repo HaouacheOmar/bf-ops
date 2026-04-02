@@ -85,11 +85,11 @@ WSGI_APPLICATION = 'bfops.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'bfops_db',         # Change to your database name
-        'USER': 'postgres',         # Change to your database user
-        'PASSWORD': 'root',         # Change to your database password
-        'HOST': 'localhost',        # Change if your DB is hosted elsewhere
-        'PORT': '5432',             # Default PostgreSQL port
+        'NAME': 'bfops_db',         
+        'USER': 'postgres',         
+        'PASSWORD': 'root',         
+        'HOST': 'localhost',       
+        'PORT': '5432',             
     }
 }
 

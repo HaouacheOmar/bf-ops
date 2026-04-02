@@ -6,6 +6,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import PersonAddAlt1Icon from '@mui/icons-material/PersonAddAlt1';
 import SearchIcon from '@mui/icons-material/Search';
+import { getJobs } from '../api-jobs';
 import '../styles/layout.css'; // <--- Check CSS path!
 
 interface Assignment {
@@ -35,6 +36,7 @@ const AssignmentsPage = () => {
   
   const [gradePopup, setGradePopup] = useState(false);
   const [gradePopupMsg, setGradePopupMsg] = useState('');
+  const selectedPerson = persons.find(p => String(p.id) === String(form.person));
 
   const fetchAssignments = async () => {
     const params = filter ? { search: filter } : undefined;
@@ -43,18 +45,29 @@ const AssignmentsPage = () => {
   };
 
   const fetchOptions = async () => {
-    const [p, j, y] = await Promise.all([
+    const [p, y] = await Promise.all([
       axios.get('/api/persons/'),
-      axios.get('/api/jobs/'),
       axios.get('/api/years/'),
     ]);
     setPersons(p.data.results || p.data); 
-    setJobs(j.data.results || j.data); 
     setYears(y.data.results || y.data);
+  };
+
+  const fetchJobsForPersonCompany = async (companyId?: number) => {
+    if (!companyId) {
+      setJobs([]);
+      return;
+    }
+
+    const res = await getJobs({ company: companyId });
+    setJobs(res.data.results || res.data);
   };
 
   useEffect(() => { fetchAssignments(); }, [filter]);
   useEffect(() => { fetchOptions(); }, []);
+  useEffect(() => {
+    fetchJobsForPersonCompany(selectedPerson?.company);
+  }, [selectedPerson?.company]);
 
   const openNewForm = () => {
     setEditing(null);
@@ -69,30 +82,31 @@ const AssignmentsPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const person = persons.find(p => String(p.id) === String(form.person));
+    const person = selectedPerson;
     const job = jobs.find(j => String(j.id) === String(form.job));
     
     if (person && job) {
-      if (job.grade && person.grade !== job.grade) {
-        setGradePopupMsg("Person's grade does not match the required grade for this job.");
-        setGradePopup(true);
-        return;
-      }
-      if (job.grade && !person.grade) {
-        setGradePopupMsg("Person does not have a grade but the job requires one.");
+      if (person.company && String(job.company) !== String(person.company)) {
+        setGradePopupMsg('Please choose a job from the selected person\'s company.');
         setGradePopup(true);
         return;
       }
     }
     
     try {
+      const payload = {
+        person: form.person,
+        job: form.job,
+        year: form.year,
+      };
+
       if (editing) {
         // OPTIMISTIC UPDATE: Update local state immediately
-        const res = await axios.put(`/api/assignments/${editing.id}/`, form);
+        const res = await axios.put(`/api/assignments/${editing.id}/`, payload);
         setAssignments(assignments.map(a => a.id === editing.id ? res.data : a));
       } else {
         // OPTIMISTIC UPDATE: Append to local state immediately
-        const res = await axios.post('/api/assignments/', form);
+        const res = await axios.post('/api/assignments/', payload);
         setAssignments([...assignments, res.data]);
       }
       closeForm();
@@ -291,15 +305,17 @@ const AssignmentsPage = () => {
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label>Person</label>
-                <select value={form.person} onChange={e => setForm(f => ({ ...f, person: e.target.value }))} required>
+                <select value={form.person} onChange={e => setForm(f => ({ ...f, person: e.target.value, job: '' }))} required>
                   <option value="" disabled>Select Employee...</option>
                   {persons.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
                 </select>
               </div>
               <div className="form-group">
                 <label>Job Role</label>
-                <select value={form.job} onChange={e => setForm(f => ({ ...f, job: e.target.value }))} required>
-                  <option value="" disabled>Select Job...</option>
+                <select value={form.job} onChange={e => setForm(f => ({ ...f, job: e.target.value }))} required disabled={!selectedPerson || jobs.length === 0}>
+                  <option value="" disabled>
+                    {selectedPerson ? (jobs.length === 0 ? 'No jobs for this company' : 'Select Job...') : 'Select a person first'}
+                  </option>
                   {jobs.map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
                 </select>
               </div>

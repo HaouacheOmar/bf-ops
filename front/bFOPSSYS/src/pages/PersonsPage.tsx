@@ -34,14 +34,13 @@ const PersonsPage = () => {
   
   const initialFormState = { 
     first_name: '', last_name: '', national_id: '', 
-    contract_type: 'actif', grade: '', unite: '', company: '', job: ''
+    contract_type: 'actif', grade: '', unite: '', company: ''
   };
   const [form, setForm] = useState(initialFormState);
   
   const [grades, setGrades] = useState<any[]>([]);
   const [unites, setUnites] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
-  const [jobs, setJobs] = useState<any[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [bulkUploading, setBulkUploading] = useState(false);
@@ -50,7 +49,6 @@ const PersonsPage = () => {
     axios.get('/api/grades/').then(res => setGrades(res.data.results || res.data));
     axios.get('/api/unites/').then(res => setUnites(res.data.results || res.data));
     axios.get('/api/companies/').then(res => setCompanies(res.data.results || res.data));
-    axios.get('/api/jobs/').then(res => setJobs(res.data.results || res.data));
   }, []);
 
   const fetchPersons = async () => {
@@ -101,7 +99,6 @@ const PersonsPage = () => {
       grade: form.grade === '' ? null : form.grade,
       unite: form.unite === '' ? null : form.unite,
       company: form.company === '' ? null : form.company,
-      job: form.job === '' ? null : form.job,
     };
 
     if (editing) {
@@ -125,7 +122,6 @@ const PersonsPage = () => {
       grade: person.grade ? String(person.grade) : '',
       unite: person.unite ? String(person.unite) : '',
       company: person.company ? String(person.company) : '',
-      job: person.job ? String(person.job) : '',
     });
   };
 
@@ -137,7 +133,6 @@ const PersonsPage = () => {
   };
 
   const filteredCompanies = form.unite ? companies.filter(c => String(c.unite) === String(form.unite)) : companies;
-  const filteredJobs = form.company ? jobs.filter(j => String(j.company) === String(form.company)) : jobs;
 
   const getInitials = (first: string, last: string) => {
     return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
@@ -231,16 +226,9 @@ const PersonsPage = () => {
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Company</label>
-                  <select className="form-select" value={form.company} onChange={e => setForm(f => ({ ...f, company: e.target.value, job: '' }))} disabled={!form.unite && filteredCompanies.length === 0}>
+                  <select className="form-select" value={form.company} onChange={e => setForm(f => ({ ...f, company: e.target.value }))} disabled={!form.unite && filteredCompanies.length === 0}>
                     <option value="">Select...</option>
                     {filteredCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Job</label>
-                  <select className="form-select" value={form.job} onChange={e => setForm(f => ({ ...f, job: e.target.value }))} disabled={!form.company && filteredJobs.length === 0}>
-                    <option value="">Select...</option>
-                    {filteredJobs.map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
                   </select>
                 </div>
               </div>

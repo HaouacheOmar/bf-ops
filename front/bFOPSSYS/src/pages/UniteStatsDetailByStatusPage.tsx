@@ -63,7 +63,7 @@ const UniteStatsDetailByStatusPage: React.FC = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {unite.jobs.map((job) => (
+                {(unite.jobs || []).map((job) => (
                   <TableRow key={job.job_id}>
                     <TableCell>{job.job_name}</TableCell>
                     <TableCell>{job.company_name}</TableCell>
