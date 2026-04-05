@@ -1,7 +1,7 @@
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { 
   AppBar, Toolbar, Typography, Drawer, List, ListItemText, 
-  CssBaseline, Box, Container, ThemeProvider, createTheme, ListItemIcon, Divider
+  CssBaseline, Box, ThemeProvider, createTheme, ListItemIcon
 } from '@mui/material';
 import ListItemButton from '@mui/material/ListItemButton';
 import './App.css';
@@ -10,13 +10,8 @@ import './App.css';
 import GridViewIcon from '@mui/icons-material/GridView';
 import BusinessIcon from '@mui/icons-material/Business';
 import WorkOutlineIcon from '@mui/icons-material/WorkOutline';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
-import InsertChartOutlinedIcon from '@mui/icons-material/InsertChartOutlined';
-import AddBusinessOutlinedIcon from '@mui/icons-material/AddBusinessOutlined';
-import StarsOutlinedIcon from '@mui/icons-material/StarsOutlined';
-import PieChartOutlineIcon from '@mui/icons-material/PieChartOutline';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
@@ -24,14 +19,10 @@ import LogoutIcon from '@mui/icons-material/Logout';
 
 // --- Page Imports ---
 import DashboardPage from './pages/DashboardPage';
-import CompaniesPage from './pages/CompaniesPage';
 import JobsPage from './pages/JobsPage';
-import YearsPage from './pages/YearsPage';
 import PersonsPage from './pages/PersonsPage';
 import AssignmentsPage from './pages/AssignmentsPage';
-import UniteCreatePage from './pages/UniteCreatePage';
-import GradeCreatePage from './pages/GradeCreatePage';
-import QuotaManagementPage from './pages/QuotaManagementPage';
+import OrganizationPage from './pages/OrganizationPage.tsx';
 import UniteStatsDetailPageWrapper from './pages/UniteStatsDetailPageWrapper';
 import UniteStatsDetailByStatusPage from './pages/UniteStatsDetailByStatusPage';
 import TransferPage from './pages/TransferPage';
@@ -41,17 +32,10 @@ const drawerWidth = 260; // Widened slightly to match the design
 
 const navItems = [
   { label: 'Dashboard', path: '/', icon: <GridViewIcon /> },
-  { label: 'Companies', path: '/companies', icon: <BusinessIcon /> },
+  { label: 'Settings', path: '/organization', icon: <BusinessIcon /> },
   { label: 'Jobs', path: '/jobs', icon: <WorkOutlineIcon /> },
-  { label: 'Years', path: '/years', icon: <CalendarTodayIcon /> },
   { label: 'Persons', path: '/persons', icon: <PeopleAltOutlinedIcon /> },
   { label: 'Assignments', path: '/assignments', icon: <AssignmentOutlinedIcon /> },
-  { label: 'Statistics', path: '/stats', icon: <InsertChartOutlinedIcon /> },
-  
-  // Secondary / Admin items
-  { label: 'Create Unite', path: '/unites/create', icon: <AddBusinessOutlinedIcon /> },
-  { label: 'Create Grade', path: '/grades/create', icon: <StarsOutlinedIcon /> },
-  { label: 'Quota Management', path: '/quota-management', icon: <PieChartOutlineIcon /> },
   { label: 'Worker Transfer', path: '/transfer', icon: <SwapHorizIcon /> },
   { label: 'Gain/Loss Tracker', path: '/gain-loss', icon: <TrendingUpIcon /> },
 ];
@@ -71,6 +55,8 @@ const theme = createTheme({
 // We separate the layout into its own component so we can use the `useLocation` hook
 function AppLayout() {
   const location = useLocation();
+  const activeLabel = navItems.find(item => item.path === location.pathname)?.label
+    || ((location.pathname === '/companies' || location.pathname === '/unites/create' || location.pathname === '/grades/create' || location.pathname === '/years' || location.pathname === '/quota-management') ? 'Settings' : '');
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
@@ -178,7 +164,7 @@ function AppLayout() {
           <Toolbar sx={{ justifyContent: 'space-between' }}>
             {/* The page title can dynamically populate here later, or leave it blank as a spacer to match design */}
             <Typography variant="h6" fontWeight="bold">
-              {navItems.find(item => item.path === location.pathname)?.label || ''}
+              {activeLabel}
             </Typography>
             {/* Placeholder for your Search Bar and Profile Icon */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -193,15 +179,15 @@ function AppLayout() {
         <Box sx={{ p: 4, flexGrow: 1, maxWidth: 1400, margin: '0 auto', width: '100%' }}>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
-            <Route path="/companies" element={<CompaniesPage />} />
+            <Route path="/organization" element={<OrganizationPage />} />
+            <Route path="/companies" element={<Navigate to="/organization?tab=companies" replace />} />
             <Route path="/jobs" element={<JobsPage />} />
-            <Route path="/years" element={<YearsPage />} />
+            <Route path="/years" element={<Navigate to="/organization?tab=years" replace />} />
             <Route path="/persons" element={<PersonsPage />} />
             <Route path="/assignments" element={<AssignmentsPage />} />
-            <Route path="/stats" element={<DashboardPage />} />
-            <Route path="/unites/create" element={<UniteCreatePage />} />
-            <Route path="/grades/create" element={<GradeCreatePage />} />
-            <Route path="/quota-management" element={<QuotaManagementPage />} />
+            <Route path="/unites/create" element={<Navigate to="/organization?tab=unites" replace />} />
+            <Route path="/grades/create" element={<Navigate to="/organization?tab=grades" replace />} />
+            <Route path="/quota-management" element={<Navigate to="/organization?tab=quotas" replace />} />
             <Route path="/unite-stats/:uniteId/:yearId" element={<UniteStatsDetailPageWrapper />} />
             <Route path="/unite-stats-detail-by-status/:status/:year" element={<UniteStatsDetailByStatusPage />} />
             <Route path="/transfer" element={<TransferPage />} />
