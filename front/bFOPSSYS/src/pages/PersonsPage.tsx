@@ -8,7 +8,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import DescriptionIcon from '@mui/icons-material/Description';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import { useI18n } from '../i18n/translator';
 import '../styles/persons.css';
 
 interface Person {
@@ -28,6 +28,7 @@ interface Person {
 }
 
 const PersonsPage = () => {
+  const { t } = useI18n();
   const [persons, setPersons] = useState<Person[]>([]);
   const [filter, setFilter] = useState('');
   const [editing, setEditing] = useState<Person | null>(null);
@@ -82,10 +83,10 @@ const PersonsPage = () => {
       }));
       
       await bulkCreatePersons(records);
-      alert('Bulk upload successful!');
+      alert(t('Bulk upload successful!'));
       fetchPersons();
     } catch (err: any) {
-      alert('Bulk upload failed: ' + (err?.message || 'Unknown error'));
+      alert(t('Bulk upload failed:') + ' ' + (err?.message || t('Unknown error')));
     } finally {
       setBulkUploading(false);
       e.target.value = '';
@@ -138,12 +139,24 @@ const PersonsPage = () => {
     return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
   };
 
+  const getContractTypeLabel = (value: string) => {
+    if (value === 'actif') return t('Active');
+    if (value === 'contractuel') return t('Contractual');
+    return t(value || '-');
+  };
+
+  const getWorkModeLabel = (value: string) => {
+    if (value === 'actif') return t('Full-Time');
+    if (value === 'contractuel') return t('Freelance');
+    return t('-');
+  };
+
   return (
     <div className="persons-page-container">
       <header className="page-header">
         <div className="page-title">
-          <h1>Talent Management</h1>
-          <p>Review and manage individual records for the company.</p>
+          <h1>{t('Talent Management')}</h1>
+          <p>{t('Review and manage individual records for the company.')}</p>
         </div>
         <div className="header-actions">
           <input 
@@ -155,11 +168,11 @@ const PersonsPage = () => {
           />
           <button className="btn btn-outline" onClick={() => fileInputRef.current?.click()} disabled={bulkUploading}>
             <UploadFileIcon fontSize="small" />
-            {bulkUploading ? 'Uploading...' : 'Bulk Upload'}
+            {bulkUploading ? t('Uploading...') : t('Bulk Upload')}
           </button>
           <button className="btn btn-primary" onClick={() => { setEditing(null); setForm(initialFormState); }}>
             <PersonAddIcon fontSize="small" />
-            Add New Person
+            {t('Add New Person')}
           </button>
         </div>
       </header>
@@ -169,36 +182,36 @@ const PersonsPage = () => {
           <div className="card">
             <div className="card-header-flex">
               <div className="card-icon"><DescriptionIcon fontSize="small" /></div>
-              <h2 className="card-title">{editing ? 'Edit Record' : 'New Record'}</h2>
+              <h2 className="card-title">{editing ? t('Edit Record') : t('New Record')}</h2>
             </div>
 
             <form onSubmit={handleSubmit}>
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">First Name</label>
+                  <label className="form-label">{t('First Name')}</label>
                   <input type="text" className="form-input" placeholder="Jane" value={form.first_name} onChange={e => setForm(f => ({ ...f, first_name: e.target.value }))} required />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Last Name</label>
+                  <label className="form-label">{t('Last Name')}</label>
                   <input type="text" className="form-input" placeholder="Doe" value={form.last_name} onChange={e => setForm(f => ({ ...f, last_name: e.target.value }))} required />
                 </div>
               </div>
 
               <div className="form-group">
-                <label className="form-label">National ID</label>
+                <label className="form-label">{t('National ID')}</label>
                 <input type="text" className="form-input" placeholder="ID-000-00-0000" value={form.national_id} onChange={e => setForm(f => ({ ...f, national_id: e.target.value }))} required />
               </div>
 
               <div className="form-group">
-                <label className="form-label">Type of Contract</label>
+                <label className="form-label">{t('Type of Contract')}</label>
                 <select className="form-select" value={form.contract_type} onChange={e => setForm(f => ({ ...f, contract_type: e.target.value as 'actif' | 'contractuel' }))} required>
-                  <option value="actif">Actif (Permanent)</option>
-                  <option value="contractuel">Contractuel (Temporary)</option>
+                  <option value="actif">{t('Active')} ({t('Permanent')})</option>
+                  <option value="contractuel">{t('Contractual')} ({t('Temporary')})</option>
                 </select>
               </div>
 
               <div className="form-group">
-                <label className="form-label">Grade</label>
+                <label className="form-label">{t('Grade')}</label>
                 <div className="grades-toggle-container">
                   {grades.map(g => (
                     <div 
@@ -210,56 +223,51 @@ const PersonsPage = () => {
                     </div>
                   ))}
                   <div className={`grade-btn ${form.grade === '' ? 'active' : ''}`} onClick={() => setForm(f => ({ ...f, grade: '' }))}>
-                    None
+                    {t('None')}
                   </div>
                 </div>
               </div>
 
               <div className="form-group" style={{ marginTop: '20px' }}>
-                <label className="form-label">Unite</label>
+                <label className="form-label">{t('Unite')}</label>
                 <select className="form-select" value={form.unite} onChange={e => setForm(f => ({ ...f, unite: e.target.value, company: '', job: '' }))}>
-                  <option value="">Select Unite...</option>
+                  <option value="">{t('Select Unite...')}</option>
                   {unites.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
               </div>
 
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Company</label>
+                  <label className="form-label">{t('Company')}</label>
                   <select className="form-select" value={form.company} onChange={e => setForm(f => ({ ...f, company: e.target.value }))} disabled={!form.unite && filteredCompanies.length === 0}>
-                    <option value="">Select...</option>
+                    <option value="">{t('Select...')}</option>
                     {filteredCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
               </div>
 
               <button type="submit" className="btn btn-primary btn-full-width">
-                {editing ? 'Update Identity' : 'Create Identity'}
+                {editing ? t('Update Identity') : t('Create Identity')}
               </button>
               {editing && (
                  <button type="button" className="btn btn-outline btn-full-width" style={{ marginTop: '8px'}} onClick={() => { setEditing(null); setForm(initialFormState); }}>
-                   Cancel Edit
+                   {t('Cancel Edit')}
                  </button>
               )}
             </form>
-          </div>
-
-          <div className="mini-stats-card">
-            <h4 className="mini-stats-title">Total Employees Active</h4>
-            <p className="mini-stats-value">{persons.length}</p>
           </div>
         </div>
 
         <div className="right-column">
           <div className="card">
             <div className="table-header">
-              <h2 className="card-title">Personnel Registry</h2>
+              <h2 className="card-title">{t('Personnel Registry')}</h2>
               <div className="search-input-wrapper">
                 <SearchIcon className="search-icon" fontSize="small" />
                 <input 
                   type="text" 
                   className="search-input" 
-                  placeholder="Search employee record..." 
+                  placeholder={t('Search employee record...')} 
                   value={filter} 
                   onChange={e => setFilter(e.target.value)} 
                 />
@@ -269,11 +277,11 @@ const PersonsPage = () => {
             <table className="custom-table">
               <thead>
                 <tr>
-                  <th>Employee</th>
-                  <th>Contract</th>
-                  <th>Unit / Company</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th>{t('Employee')}</th>
+                  <th>{t('Contract')}</th>
+                  <th>{t('Unit / Company')}</th>
+                  <th>{t('Status')}</th>
+                  <th>{t('Actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -286,20 +294,20 @@ const PersonsPage = () => {
                         </div>
                         <div className="employee-info">
                           <h4>{person.first_name} {person.last_name}</h4>
-                          <p>{person.job_name || 'No Job Assigned'}</p>
+                          <p>{person.job_name || t('No Job Assigned')}</p>
                         </div>
                       </div>
                     </td>
-                    <td>{person.contract_type === 'actif' ? 'Full-Time' : 'Freelance'}</td>
+                    <td>{getWorkModeLabel(person.contract_type)}</td>
                     <td>
                       <div className="employee-info">
-                        <h4>{person.company_name || 'No Company'}</h4>
+                        <h4>{person.company_name || t('No Company')}</h4>
                         <p>{person.unite_name || '-'}</p>
                       </div>
                     </td>
                     <td>
                       <span className={`status-chip ${person.contract_type}`}>
-                        {person.contract_type}
+                        {getContractTypeLabel(person.contract_type)}
                       </span>
                     </td>
                     <td>
@@ -313,23 +321,12 @@ const PersonsPage = () => {
                 {persons.length === 0 && (
                   <tr>
                     <td colSpan={5} style={{ textAlign: 'center', padding: '32px', color: '#6b7280' }}>
-                      No employee records found.
+                      {t('No employee records found.')}
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-          </div>
-
-          <div className="audit-banner">
-             <div className="audit-info">
-                <div className="audit-icon"><InfoOutlinedIcon /></div>
-                <div className="audit-text">
-                   <h4>Quarterly Audit Reminder</h4>
-                   <p>Please ensure all contract assignments are digitally reviewed by Friday.</p>
-                </div>
-             </div>
-             <button className="btn btn-white">Review Policy</button>
           </div>
         </div>
       </div>

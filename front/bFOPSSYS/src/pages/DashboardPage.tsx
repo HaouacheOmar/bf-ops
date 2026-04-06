@@ -6,6 +6,7 @@ import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
 import Grid from '@mui/material/Grid';
 import { useNavigate } from 'react-router-dom';
+import { useI18n } from '../i18n/translator';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, ChartDataLabels);
 
@@ -14,6 +15,7 @@ interface Unite { id: number; name: string; }
 
 const DashboardPage = () => {
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   // Filter States
   const [year, setYear] = useState<string>('');
@@ -78,7 +80,7 @@ const DashboardPage = () => {
   }
 
   // --- JOB CHART LOGIC ---
-  const handleJobPieClick = (event: any, elements: any) => {
+  const handleJobPieClick = (_event: any, elements: any) => {
     if (!elements.length) return;
     const idx = elements[0].index;
     const status = ['deficit', 'balanced', 'surplus'][idx];
@@ -97,12 +99,12 @@ const DashboardPage = () => {
     labels: filteredJobStats.map(j => j.job_name),
     datasets: [
       {
-        label: 'Current Workers',
+        label: t('Current Workers'),
         data: filteredJobStats.map(j => j.current_workers),
         backgroundColor: '#1976d2',
       },
       {
-        label: 'Max Workers',
+        label: t('Max Workers'),
         data: filteredJobStats.map(j => j.max_workers),
         backgroundColor: '#90caf9',
       },
@@ -152,12 +154,12 @@ const DashboardPage = () => {
     labels: companyStats.map(c => c.company_name),
     datasets: [
       {
-        label: 'Current Workers',
+        label: t('Current Workers'),
         data: companyStats.map(c => c.current_workers),
         backgroundColor: '#9c27b0',
       },
       {
-        label: 'Max Workers',
+        label: t('Max Workers'),
         data: companyStats.map(c => c.max_workers),
         backgroundColor: '#ce93d8',
       },
@@ -199,16 +201,16 @@ const DashboardPage = () => {
   };
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
+    <Box sx={{ p: { xs: 2, md: 3 }, width: '100%' }}>
       <Typography variant="h4" fontWeight="bold" color="primary.main" gutterBottom sx={{ mb: 4 }}>
-        Statistics Dashboard
+        {t('Statistics Dashboard')}
       </Typography>
       
       {/* FILTERS */}
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 4 }}>
         <FormControl sx={{ minWidth: 200 }}>
-          <InputLabel>Year</InputLabel>
-          <Select value={year} label="Year" onChange={e => setYear(e.target.value)}>
+          <InputLabel>{t('Year')}</InputLabel>
+          <Select value={year} label={t('Year')} onChange={e => setYear(e.target.value)}>
             {years.map(y => (
               <MenuItem key={y.id} value={y.id}>{y.year}</MenuItem>
             ))}
@@ -216,17 +218,17 @@ const DashboardPage = () => {
         </FormControl>
 
         <FormControl sx={{ minWidth: 200 }}>
-          <InputLabel>Unite</InputLabel>
+          <InputLabel>{t('Unite')}</InputLabel>
           <Select 
             value={unite} 
-            label="Unite" 
+            label={t('Unite')} 
             onChange={e => {
               setUnite(e.target.value);
               setCompany('');
               setSelectedJob('all');
             }}
           >
-            <MenuItem value="">All Unites</MenuItem>
+            <MenuItem value="">{t('All Unites')}</MenuItem>
             {unites.map(u => (
               <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>
             ))}
@@ -234,17 +236,17 @@ const DashboardPage = () => {
         </FormControl>
 
         <FormControl sx={{ minWidth: 200 }}>
-          <InputLabel>Company</InputLabel>
+          <InputLabel>{t('Company')}</InputLabel>
           <Select 
             value={company} 
-            label="Company" 
+            label={t('Company')} 
             onChange={e => {
               setCompany(e.target.value);
               setSelectedJob('all');
             }} 
             disabled={!unite && filteredCompanies.length === 0}
           >
-            <MenuItem value="">All Companies</MenuItem>
+            <MenuItem value="">{t('All Companies')}</MenuItem>
             {filteredCompanies.map(c => (
               <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
             ))}
@@ -252,14 +254,14 @@ const DashboardPage = () => {
         </FormControl>
 
         <FormControl sx={{ minWidth: 200 }}>
-          <InputLabel>Job</InputLabel>
+          <InputLabel>{t('Job')}</InputLabel>
           <Select
             value={selectedJob}
-            label="Job"
+            label={t('Job')}
             onChange={e => setSelectedJob(e.target.value)}
             disabled={filteredDropdownJobs.length === 0}
           >
-            <MenuItem value="all">All Jobs</MenuItem>
+            <MenuItem value="all">{t('All Jobs')}</MenuItem>
             {filteredDropdownJobs.map(j => (
               <MenuItem key={j.id} value={j.id}>{j.name}</MenuItem>
             ))}
@@ -273,7 +275,7 @@ const DashboardPage = () => {
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, md: 7 }}>
               <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%' }}>
-                <Typography variant="h6" fontWeight="medium" mb={3}>Job Capacity vs. Actual</Typography>
+                <Typography variant="h6" fontWeight="medium" mb={3}>{t('Job Capacity vs. Actual')}</Typography>
                 <Bar data={jobBarData} options={{ responsive: true, plugins: { legend: { position: 'top' } } }} />
               </Paper>
             </Grid>
@@ -294,7 +296,7 @@ const DashboardPage = () => {
               <Grid size={{ xs: 12, md: 7 }}>
                 <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%' }}>
                   <Typography variant="h6" fontWeight="medium" mb={3}>
-                    Company Capacity vs. Actual
+                    {t('Company Capacity vs. Actual')}
                   </Typography>
                   <Bar data={companyBarData} options={{ responsive: true, plugins: { legend: { position: 'top' } } }} />
                 </Paper>

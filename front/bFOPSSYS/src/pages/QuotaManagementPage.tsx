@@ -5,6 +5,7 @@ import axios from 'axios';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PieChartIcon from '@mui/icons-material/PieChart';
+import { useI18n } from '../i18n/translator';
 import '../styles/layout.css';
 
 interface UniteQuota {
@@ -16,6 +17,7 @@ interface UniteQuota {
 }
 
 const QuotaManagementPage: React.FC = () => {
+  const { t } = useI18n();
   const [quotas, setQuotas] = useState<UniteQuota[]>([]);
   const [years, setYears] = useState<{ id: number; year: number }[]>([]);
   const [unites, setUnites] = useState<{ id: number; name: string }[]>([]);
@@ -82,7 +84,7 @@ const QuotaManagementPage: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if(window.confirm("Delete this quota?")) {
+    if(window.confirm(t('Delete this quota?'))) {
       await deleteUniteQuota(id);
       getUniteQuotas().then(res => setQuotas(res.data.results || res.data));
     }
@@ -92,42 +94,42 @@ const QuotaManagementPage: React.FC = () => {
     <div className="assignments-page-container">
       {/* Retained MUI Dialog for the warning popup */}
       <Dialog open={showPopup} onClose={() => setShowPopup(false)}>
-        <DialogTitle>Quota Exceeded</DialogTitle>
+        <DialogTitle>{t('Quota Exceeded')}</DialogTitle>
         <DialogContent>{popupMsg}</DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowPopup(false)}>OK</Button>
+          <Button onClick={() => setShowPopup(false)}>{t('OK')}</Button>
         </DialogActions>
       </Dialog>
 
       <header className="page-header">
         <div className="page-title">
-          <h1>Quota Management</h1>
-          <span className="breadcrumb">Settings &gt; <span className="breadcrumb-active">Quotas</span></span>
+          <h1>{t('Quota Management')}</h1>
+          <span className="breadcrumb">{t('Settings')} &gt; <span className="breadcrumb-active">{t('Quotas')}</span></span>
         </div>
       </header>
 
       <div className="top-grid" style={{gridTemplateColumns: '300px'}}>
         <div className="card">
-          <h2 className="card-title">Assign Quota</h2>
-          <p className="card-subtitle">Allocate hiring quotas to specific Unites.</p>
+          <h2 className="card-title">{t('Assign Quota')}</h2>
+          <p className="card-subtitle">{t('Allocate hiring quotas to specific Unites.')}</p>
           <button className="btn btn-primary" style={{ width: '100%' }} onClick={openNewForm}>
-            <PieChartIcon fontSize="small" /> Add Quota
+            <PieChartIcon fontSize="small" /> {t('Add Quota')}
           </button>
         </div>
       </div>
 
       <div className="card">
         <div className="table-header-row">
-          <h2 className="card-title" style={{marginBottom: '4px'}}>Allocated Quotas</h2>
+          <h2 className="card-title" style={{marginBottom: '4px'}}>{t('Allocated Quotas')}</h2>
         </div>
 
         <table className="custom-table">
           <thead>
             <tr>
-              <th>Fiscal Year</th>
-              <th>Business Unite</th>
-              <th>Quota Limit</th>
-              <th style={{ width: '100px' }}>Actions</th>
+              <th>{t('Fiscal Year')}</th>
+              <th>{t('Business Unite')}</th>
+              <th>{t('Quota Limit')}</th>
+              <th style={{ width: '100px' }}>{t('Actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -151,29 +153,29 @@ const QuotaManagementPage: React.FC = () => {
       {isFormOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2 style={{marginTop: 0, marginBottom: '24px'}}>{editing ? 'Edit Quota' : 'Assign Quota'}</h2>
+            <h2 style={{marginTop: 0, marginBottom: '24px'}}>{editing ? t('Edit Quota') : t('Assign Quota')}</h2>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label>Fiscal Year</label>
+                <label>{t('Fiscal Year')}</label>
                 <select value={form.year} onChange={e => setForm({ ...form, year: e.target.value })} required>
-                  <option value="" disabled>Select Year...</option>
+                  <option value="" disabled>{t('Select Year...')}</option>
                   {years.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
                 </select>
               </div>
               <div className="form-group">
-                <label>Unite</label>
+                <label>{t('Unite')}</label>
                 <select value={form.unite} onChange={e => setForm({ ...form, unite: e.target.value })} required>
-                  <option value="" disabled>Select Unite...</option>
+                  <option value="" disabled>{t('Select Unite...')}</option>
                   {unites.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
               </div>
               <div className="form-group">
-                <label>Quota Count</label>
+                <label>{t('Quota Count')}</label>
                 <input type="number" className="filter-select" value={form.quota} onChange={e => setForm({ ...form, quota: e.target.value })} required />
               </div>
               <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={closeForm}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editing ? 'Update' : 'Save'}</button>
+                <button type="button" className="btn btn-outline" onClick={closeForm}>{t('Cancel')}</button>
+                <button type="submit" className="btn btn-primary">{editing ? t('Update') : t('Save')}</button>
               </div>
             </form>
           </div>

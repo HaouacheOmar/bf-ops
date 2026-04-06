@@ -6,9 +6,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import { useI18n } from '../i18n/translator';
 import '../styles/jobs.css'; 
 
 // 1. Updated Interface to handle array of grades
@@ -25,6 +23,7 @@ interface Job {
 }
 
 const JobsPage = () => {
+  const { t } = useI18n();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
   const [grades, setGrades] = useState<{ id: number; name: string }[]>([]);
@@ -80,10 +79,10 @@ const JobsPage = () => {
       }));
       
       await bulkCreateJobs(records);
-      alert('Bulk upload successful!');
+      alert(t('Bulk upload successful!'));
       fetchJobs();
     } catch (err: any) {
-      alert('Bulk upload failed: ' + (err?.message || 'Unknown error'));
+      alert(t('Bulk upload failed:') + ' ' + (err?.message || t('Unknown error')));
     } finally {
       setBulkUploading(false);
       e.target.value = '';
@@ -122,7 +121,7 @@ const JobsPage = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if(window.confirm("Delete this job?")) {
+    if(window.confirm(t('Delete this job?'))) {
       await axios.delete(`/api/jobs/${id}/`);
       fetchJobs();
     }
@@ -144,8 +143,8 @@ const JobsPage = () => {
     <div className="jobs-page-container">
       <header className="page-header">
         <div className="page-title">
-          <h1>Job Inventory</h1>
-          <p>Manage organizational roles, recruitment caps, and operational grading benchmarks.</p>
+          <h1>{t('Job Inventory')}</h1>
+          <p>{t('Manage organizational roles, recruitment caps, and operational grading benchmarks.')}</p>
         </div>
         <div className="header-actions">
           <input 
@@ -161,11 +160,11 @@ const JobsPage = () => {
             disabled={bulkUploading}
           >
             <UploadFileIcon fontSize="small" />
-            {bulkUploading ? 'Uploading...' : 'Bulk Upload (Excel)'}
+            {bulkUploading ? t('Uploading...') : t('Bulk Upload (Excel)')}
           </button>
           <button className="btn btn-primary" onClick={() => { setEditing(null); setForm(initialFormState); }}>
             <AddCircleOutlineIcon fontSize="small" />
-            Create New Job
+            {t('Create New Job')}
           </button>
         </div>
       </header>
@@ -173,36 +172,36 @@ const JobsPage = () => {
       <div className="content-grid">
         <div className="left-column">
           <div className="card">
-            <h2 className="card-title">{editing ? 'Edit Role' : 'Quick Add Role'}</h2>
-            <p className="card-subtitle">{editing ? 'Update position details.' : 'Register a new position immediately.'}</p>
+            <h2 className="card-title">{editing ? t('Edit Role') : t('Quick Add Role')}</h2>
+            <p className="card-subtitle">{editing ? t('Update position details.') : t('Register a new position immediately.')}</p>
             
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label className="form-label">Job Name</label>
+                <label className="form-label">{t('Job Name')}</label>
                 <input type="text" className="form-input" placeholder="e.g. Senior Data Analyst" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
               </div>
 
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Job Code</label>
+                  <label className="form-label">{t('Job Code')}</label>
                   <input type="text" className="form-input" placeholder="DAT-001" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} required />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Max Workers</label>
+                  <label className="form-label">{t('Max Workers')}</label>
                   <input type="number" className="form-input" placeholder="0" value={form.max_workers} onChange={e => setForm(f => ({ ...f, max_workers: e.target.value }))} required min="1" />
                 </div>
               </div>
 
               <div className="form-group">
-                <label className="form-label">Company</label>
+                <label className="form-label">{t('Company')}</label>
                 <select className="form-select" value={form.company} onChange={e => setForm(f => ({ ...f, company: e.target.value }))} required>
-                  <option value="">Select Company...</option>
+                  <option value="">{t('Select Company...')}</option>
                   {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
 
               <div className="form-group">
-                <label className="form-label">Accepted Grades (Hold Ctrl/Cmd to select multiple)</label>
+                <label className="form-label">{t('Accepted Grades (Hold Ctrl/Cmd to select multiple)')}</label>
                 {/* 4. Changed to a multiple select UI */}
                 <select 
                   multiple 
@@ -216,11 +215,11 @@ const JobsPage = () => {
               </div>
 
               <button type="submit" className="btn btn-primary btn-full-width">
-                {editing ? 'Update Registry' : 'Add to Registry'}
+                {editing ? t('Update Registry') : t('Add to Registry')}
               </button>
               {editing && (
                  <button type="button" className="btn btn-outline btn-full-width" style={{marginTop: '8px'}} onClick={() => { setEditing(null); setForm(initialFormState); }}>
-                   Cancel Edit
+                   {t('Cancel Edit')}
                  </button>
               )}
             </form>
@@ -231,14 +230,14 @@ const JobsPage = () => {
           <div className="card">
             <div className="table-top-bar">
               <div className="stats-pills">
-                <div className="stat-pill"><span className="dot"></span> {jobs.length} TOTAL ROLES</div>
-                <div className="stat-pill"><span className="dot"></span> {totalCapacity} CAPACITY</div>
+                <div className="stat-pill"><span className="dot"></span> {jobs.length} {t('TOTAL ROLES')}</div>
+                <div className="stat-pill"><span className="dot"></span> {totalCapacity} {t('CAPACITY')}</div>
               </div>
               <div className="filter-wrapper">
                 <input 
                   type="text" 
                   className="search-input" 
-                  placeholder="Search positions..." 
+                  placeholder={t('Search positions...')} 
                   value={filter} 
                   onChange={e => setFilter(e.target.value)} 
                 />
@@ -248,16 +247,16 @@ const JobsPage = () => {
             <table className="custom-table">
               <thead>
                 <tr>
-                  <th>Job Title & Code</th>
-                  <th>Required Grades</th>
-                  <th>Max Workers</th>
-                  <th>Created At</th>
-                  <th>Actions</th>
+                  <th>{t('Job Title & Code')}</th>
+                  <th>{t('Required Grades')}</th>
+                  <th>{t('Max Workers')}</th>
+                  <th>{t('Created At')}</th>
+                  <th>{t('Actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {jobs.map(job => {
-                  const companyName = job.company_name || companies.find(c => c.id === job.company)?.name || 'Unknown';
+                  const companyName = job.company_name || companies.find(c => c.id === job.company)?.name || t('Unknown');
                   const visualFill = Math.min((job.max_workers / 20) * 100, 100);
 
                   return (
@@ -276,7 +275,7 @@ const JobsPage = () => {
                               <span key={g.id} className="grade-pill">{g.name}</span>
                             ))
                           ) : (
-                            <span className="grade-pill" style={{ opacity: 0.5 }}>None</span>
+                            <span className="grade-pill" style={{ opacity: 0.5 }}>{t('None')}</span>
                           )}
                         </div>
                       </td>
@@ -301,36 +300,12 @@ const JobsPage = () => {
                 {jobs.length === 0 && (
                   <tr>
                     <td colSpan={5} style={{ textAlign: 'center', padding: '32px', color: '#6b7280' }}>
-                      No roles found matching your search.
+                      {t('No roles found matching your search.')}
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-          </div>
-
-          <div className="bottom-cards-row">
-            <div className="bottom-card">
-              <div className="bottom-card-icon blue"><TrendingUpIcon /></div>
-              <div className="bottom-card-content">
-                <p>Growth Trend</p>
-                <h4>+12% Positions</h4>
-              </div>
-            </div>
-            <div className="bottom-card">
-              <div className="bottom-card-icon purple"><PeopleAltIcon /></div>
-              <div className="bottom-card-content">
-                <p>Hiring Velocity</p>
-                <h4>High Demand</h4>
-              </div>
-            </div>
-            <div className="bottom-card">
-              <div className="bottom-card-icon gray"><CheckCircleIcon /></div>
-              <div className="bottom-card-content">
-                <p>System Status</p>
-                <h4>Registry Synced</h4>
-              </div>
-            </div>
           </div>
         </div>
       </div>

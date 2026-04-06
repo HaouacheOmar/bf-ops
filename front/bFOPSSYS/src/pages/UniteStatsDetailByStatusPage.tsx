@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Typography, Paper, Container, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import { Typography, Paper, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import axios from 'axios';
+import { useI18n } from '../i18n/translator';
 
 interface UniteStat {
   unite_id: number;
@@ -21,6 +22,7 @@ interface UniteStat {
 }
 
 const UniteStatsDetailByStatusPage: React.FC = () => {
+  const { t } = useI18n();
   const { status, year } = useParams<{ status: string; year: string }>();
   const [uniteStats, setUniteStats] = useState<UniteStat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,14 +38,14 @@ const UniteStatsDetailByStatusPage: React.FC = () => {
       .finally(() => setLoading(false));
   }, [status, year]);
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div>{t('Loading...')}</div>;
 
   return (
-    <Container maxWidth="xl">
+    <Box sx={{ width: '100%', p: { xs: 2, md: 3 } }}>
       <Typography variant="h4" gutterBottom>
-        Unites with status: {status}
+        {t('Unites with status:')} {t(status || '')}
       </Typography>
-      {uniteStats.length === 0 && <Typography>No unites found for this status.</Typography>}
+      {uniteStats.length === 0 && <Typography>{t('No unites found for this status.')}</Typography>}
       {uniteStats.map(unite => (
         <Paper key={unite.unite_id} sx={{ p: 3, mt: 4, mb: 4 }}>
           <Typography variant="h5" gutterBottom>
@@ -53,13 +55,13 @@ const UniteStatsDetailByStatusPage: React.FC = () => {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Job</TableCell>
-                  <TableCell>Company</TableCell>
-                  <TableCell align="right">Current Workers</TableCell>
-                  <TableCell align="right">Max Workers</TableCell>
-                  <TableCell align="right">Missing</TableCell>
-                  <TableCell align="right">Percentage</TableCell>
-                  <TableCell align="right">Status</TableCell>
+                  <TableCell>{t('Job')}</TableCell>
+                  <TableCell>{t('Company')}</TableCell>
+                  <TableCell align="right">{t('Current Workers')}</TableCell>
+                  <TableCell align="right">{t('Max Workers')}</TableCell>
+                  <TableCell align="right">{t('Missing')}</TableCell>
+                  <TableCell align="right">{t('Percentage')}</TableCell>
+                  <TableCell align="right">{t('Status')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -71,7 +73,7 @@ const UniteStatsDetailByStatusPage: React.FC = () => {
                     <TableCell align="right">{job.max_workers}</TableCell>
                     <TableCell align="right">{job.difference < 0 ? -job.difference : 0}</TableCell>
                     <TableCell align="right">{job.percentage.toFixed(1)}%</TableCell>
-                    <TableCell align="right">{job.status}</TableCell>
+                    <TableCell align="right">{t(job.status)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -79,7 +81,7 @@ const UniteStatsDetailByStatusPage: React.FC = () => {
           </TableContainer>
         </Paper>
       ))}
-    </Container>
+    </Box>
   );
 };
 

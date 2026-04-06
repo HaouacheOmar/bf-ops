@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Alert,
   Box,
@@ -18,6 +18,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { useI18n } from '../i18n/translator';
 
 type Assignment = {
   id: number;
@@ -60,6 +61,7 @@ type Transfer = {
 const asList = (payload: any) => payload?.results || payload || [];
 
 export default function TransferPage() {
+  const { t } = useI18n();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [unites, setUnites] = useState<Unite[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -138,12 +140,12 @@ export default function TransferPage() {
     setTransferError('');
 
     if (!selectedAssignment || !selectedUnite) {
-      alert("Veuillez sélectionner un travailleur et une unité de destination.");
+      alert(t('Please select a worker and a destination unite.'));
       return;
     }
 
     if (currentWorkerInfo?.unite_id && String(currentWorkerInfo.unite_id) === selectedUnite) {
-      setTransferError('Le travailleur est deja dans cette unite. Choisissez une autre unite.');
+      setTransferError(t('The worker is already in this unite. Please choose another unite.'));
       return;
     }
 
@@ -162,7 +164,7 @@ export default function TransferPage() {
     const data = await response.json();
 
     if (response.ok) {
-      alert(data.message);
+      alert(t(data?.message || 'Transfer completed successfully.'));
       setSelectedAssignment('');
       setSelectedUnite('');
       setSelectedCompany('');
@@ -170,40 +172,39 @@ export default function TransferPage() {
       setReason('');
       await loadTransfers();
     } else {
-      setTransferError(data?.error || 'Une erreur est survenue pendant le transfert.');
+      setTransferError(t(data?.error || 'An error occurred during transfer.'));
     }
   };
 
   return (
     <Box
       sx={{
-        p: 3,
-        maxWidth: 1200,
-        mx: 'auto',
+        p: { xs: 2, md: 3 },
+        width: '100%',
         background: 'linear-gradient(180deg, rgba(237,247,255,0.8) 0%, rgba(255,255,255,1) 35%)',
         borderRadius: 3,
       }}
     >
       <Typography variant="h4" fontWeight="bold" color="primary.main" gutterBottom sx={{ mb: 0.5 }}>
-        Transfer Center
+        {t('Transfer Center')}
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-        Transfer an employee between unites and optionally assign a destination company and job.
+        {t('Transfer an employee between unites and optionally assign a destination company and job.')}
       </Typography>
 
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 5 }}>
           <Paper elevation={3} sx={{ p: 4, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
             <Typography variant="h6" fontWeight="medium" mb={3}>
-              Transfert d'Unite
+              {t('Unite Transfer')}
             </Typography>
 
             <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>1. Selectionner l'employe</InputLabel>
+              <InputLabel>{t('1. Select Worker')}</InputLabel>
               <Select
                 value={selectedAssignment}
                 onChange={(e) => setSelectedAssignment(e.target.value)}
-                label="1. Selectionner l'employe"
+                label={t('1. Select Worker')}
               >
                 {assignments.map((a) => (
                   <MenuItem key={a.id} value={String(a.id)}>
@@ -215,20 +216,20 @@ export default function TransferPage() {
 
             {currentWorkerInfo && (
               <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
-                <strong>Unite actuelle:</strong> {currentWorkerInfo.unite_name || 'Unite inconnue'}
+                <strong>{t('Current Unite:')}</strong> {currentWorkerInfo.unite_name || t('Unknown Unite')}
                 <br />
                 <span style={{ fontSize: '0.85em', color: '#555' }}>
-                  (Poste actuel: {currentWorkerInfo.job_name})
+                  ({t('Current Job:')} {currentWorkerInfo.job_name})
                 </span>
               </Alert>
             )}
 
             <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>2. Unite de destination</InputLabel>
+              <InputLabel>{t('2. Destination Unite')}</InputLabel>
               <Select
                 value={selectedUnite}
                 onChange={(e) => setSelectedUnite(e.target.value)}
-                label="2. Unite de destination"
+                label={t('2. Destination Unite')}
               >
                 {destinationUnites.map((u) => (
                   <MenuItem key={u.id} value={String(u.id)}>
@@ -245,13 +246,13 @@ export default function TransferPage() {
             )}
 
             <FormControl fullWidth sx={{ mb: 3 }} disabled={!selectedUnite}>
-              <InputLabel>3. Company (optionnel)</InputLabel>
+              <InputLabel>{t('3. Company (optional)')}</InputLabel>
               <Select
                 value={selectedCompany}
                 onChange={(e) => setSelectedCompany(e.target.value)}
-                label="3. Company (optionnel)"
+                label={t('3. Company (optional)')}
               >
-                <MenuItem value="">Aucune selection</MenuItem>
+                <MenuItem value="">{t('No selection')}</MenuItem>
                 {destinationCompanies.map((company) => (
                   <MenuItem key={company.id} value={String(company.id)}>
                     {company.name}
@@ -261,13 +262,13 @@ export default function TransferPage() {
             </FormControl>
 
             <FormControl fullWidth sx={{ mb: 3 }} disabled={!selectedUnite}>
-              <InputLabel>4. Job (optionnel)</InputLabel>
+              <InputLabel>{t('4. Job (optional)')}</InputLabel>
               <Select
                 value={selectedJob}
                 onChange={(e) => setSelectedJob(e.target.value)}
-                label="4. Job (optionnel)"
+                label={t('4. Job (optional)')}
               >
-                <MenuItem value="">En attente d'affectation</MenuItem>
+                <MenuItem value="">{t('Pending assignment')}</MenuItem>
                 {destinationJobs.map((job) => (
                   <MenuItem key={job.id} value={String(job.id)}>
                     {job.name} ({job.code})
@@ -278,7 +279,7 @@ export default function TransferPage() {
 
             <TextField
               fullWidth
-              label="Motif du transfert (optionnel)"
+              label={t('Transfer reason (optional)')}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               sx={{ mb: 4 }}
@@ -292,7 +293,7 @@ export default function TransferPage() {
               onClick={handleTransfer}
               sx={{ py: 1.5, borderRadius: 2 }}
             >
-              Valider le transfert
+              {t('Confirm Transfer')}
             </Button>
           </Paper>
         </Grid>
@@ -301,19 +302,19 @@ export default function TransferPage() {
           <Paper elevation={3} sx={{ p: 3, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="h6" fontWeight="medium">
-                Historique des transferts
+                {t('Transfer History')}
               </Typography>
-              <Chip label={`${transfers.length} transferts`} color="primary" variant="outlined" />
+              <Chip label={`${transfers.length} ${t('transfers')}`} color="primary" variant="outlined" />
             </Box>
 
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Employe</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>De</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Vers</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Motif</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{t('Employee')}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{t('From')}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{t('To')}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{t('Date')}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>{t('Reason')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -329,7 +330,7 @@ export default function TransferPage() {
                 {transfers.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
-                      Aucun transfert enregistre.
+                      {t('No transfer records found.')}
                     </TableCell>
                   </TableRow>
                 )}

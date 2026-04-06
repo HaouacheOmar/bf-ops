@@ -3,9 +3,11 @@ import { api } from '../api'; // Swapped out createUnite to use api.post directl
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import { useI18n } from '../i18n/translator';
 import '../styles/layout.css';
 
 const UniteCreatePage: React.FC = () => {
+  const { t } = useI18n();
   const [unites, setUnites] = useState<any[]>([]);
   const [error, setError] = useState('');
   
@@ -52,7 +54,7 @@ const UniteCreatePage: React.FC = () => {
       if (err?.response?.data) {
         setError(err.response.data.detail || JSON.stringify(err.response.data));
       } else {
-        setError('Error saving unite');
+        setError(t('Error saving unite'));
       }
     }
   };
@@ -65,7 +67,7 @@ const UniteCreatePage: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if(window.confirm("Delete this unite?")) {
+    if(window.confirm(t('Delete this unite?'))) {
       await api.delete(`/unites/${id}/`);
       // DELETE: Filter the item out of the local state immediately
       setUnites(unites.filter(u => u.id !== id));
@@ -77,32 +79,32 @@ const UniteCreatePage: React.FC = () => {
     <div className="assignments-page-container">
       <header className="page-header">
         <div className="page-title">
-          <h1>Business Unites</h1>
-          <span className="breadcrumb">Settings &gt; <span className="breadcrumb-active">Unites Directory</span></span>
+          <h1>{t('Business Unites')}</h1>
+          <span className="breadcrumb">{t('Settings')} &gt; <span className="breadcrumb-active">{t('Unites Directory')}</span></span>
         </div>
       </header>
 
       <div className="top-grid" style={{gridTemplateColumns: '300px'}}>
         <div className="card">
-          <h2 className="card-title">New Unite</h2>
-          <p className="card-subtitle">Create a new organizational structure unit.</p>
+          <h2 className="card-title">{t('New Unite')}</h2>
+          <p className="card-subtitle">{t('Create a new organizational structure unit.')}</p>
           <button className="btn btn-primary" style={{ width: '100%' }} onClick={openNewForm}>
-            <AccountTreeIcon fontSize="small" /> Add Unite
+            <AccountTreeIcon fontSize="small" /> {t('Add Unite')}
           </button>
         </div>
       </div>
 
       <div className="card">
         <div className="table-header-row">
-          <h2 className="card-title" style={{marginBottom: '4px'}}>Registered Unites</h2>
+          <h2 className="card-title" style={{marginBottom: '4px'}}>{t('Registered Unites')}</h2>
         </div>
 
         <table className="custom-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Code</th>
-              <th style={{ width: '100px' }}>Actions</th>
+              <th>{t('Name')}</th>
+              <th>{t('Code')}</th>
+              <th style={{ width: '100px' }}>{t('Actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -125,20 +127,20 @@ const UniteCreatePage: React.FC = () => {
       {isFormOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2 style={{marginTop: 0, marginBottom: '24px'}}>{editing ? 'Edit Unite' : 'Create Unite'}</h2>
+            <h2 style={{marginTop: 0, marginBottom: '24px'}}>{editing ? t('Edit Unite') : t('Create Unite')}</h2>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label>Unite Name</label>
+                <label>{t('Unite Name')}</label>
                 <input type="text" className="filter-select" value={form.name} onChange={(e) => setForm({...form, name: e.target.value})} required />
               </div>
               <div className="form-group">
-                <label>Unite Code</label>
+                <label>{t('Unite Code')}</label>
                 <input type="text" className="filter-select" value={form.code} onChange={(e) => setForm({...form, code: e.target.value})} required />
               </div>
               {error && <p style={{ color: '#ef4444', fontSize: '12px' }}>{error}</p>}
               <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={closeForm}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editing ? 'Update' : 'Save'}</button>
+                <button type="button" className="btn btn-outline" onClick={closeForm}>{t('Cancel')}</button>
+                <button type="submit" className="btn btn-primary">{editing ? t('Update') : t('Save')}</button>
               </div>
             </form>
           </div>

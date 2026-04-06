@@ -10,6 +10,8 @@ class UniteQuotaSerializer(serializers.ModelSerializer):
 class TransferHistorySerializer(serializers.ModelSerializer):
     from_unite_name = serializers.CharField(source="from_unite.name", read_only=True)
     to_unite_name = serializers.CharField(source="to_unite.name", read_only=True)
+    from_company_name = serializers.CharField(source="assignment.job.company.name", read_only=True)
+    to_company_name = serializers.SerializerMethodField()
     person_name = serializers.CharField(source="assignment.person.__str__", read_only=True)
     job_name = serializers.CharField(source="assignment.job.name", read_only=True)
     year_value = serializers.IntegerField(source="assignment.year.year", read_only=True)
@@ -24,11 +26,21 @@ class TransferHistorySerializer(serializers.ModelSerializer):
             "year_value",
             "from_unite",
             "from_unite_name",
+            "from_company_name",
             "to_unite",
             "to_unite_name",
+            "to_company_name",
             "transfer_date",
             "reason",
         ]
+
+    def get_to_company_name(self, obj):
+        """Extract the destination company name from the to_unite's companies"""
+        if obj.to_unite:
+            companies = obj.to_unite.companies.all()
+            if companies.exists():
+                return companies.first().name
+        return "-"
 
 class JobSerializer(serializers.ModelSerializer):
     # Added a custom field to return the names and IDs of all accepted grades

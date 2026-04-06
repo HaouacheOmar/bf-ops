@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Typography, Paper, Container, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import { Typography, Paper, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { Bar } from 'react-chartjs-2';
 import axios from 'axios';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
@@ -25,8 +25,10 @@ interface Company {
 
 
 import { FormControl, InputLabel, Select, MenuItem } from '@mui/material';
+import { useI18n } from '../i18n/translator';
 
 const UniteStatsDetailPage: React.FC<{ uniteId: string; yearId: string }> = ({ uniteId, yearId }) => {
+  const { t } = useI18n();
   const [jobStats, setJobStats] = useState<JobStat[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
@@ -39,19 +41,19 @@ const UniteStatsDetailPage: React.FC<{ uniteId: string; yearId: string }> = ({ u
   }, [uniteId, yearId]);
 
   return (
-    <Container maxWidth="md">
+    <Box sx={{ width: '100%', p: { xs: 2, md: 3 } }}>
       <Paper sx={{ p: 3, mt: 4 }}>
         <Typography variant="h5" gutterBottom>
-          Unite Details
+          {t('Unite Details')}
         </Typography>
         <FormControl sx={{ minWidth: 200, mb: 3 }}>
-          <InputLabel>Job</InputLabel>
+          <InputLabel>{t('Job')}</InputLabel>
           <Select
             value={selectedJob}
-            label="Job"
+            label={t('Job')}
             onChange={e => setSelectedJob(e.target.value)}
           >
-            <MenuItem value="all">All</MenuItem>
+            <MenuItem value="all">{t('All')}</MenuItem>
             {jobs.map(j => (
               <MenuItem key={j.id} value={j.id}>{j.name}</MenuItem>
             ))}
@@ -66,12 +68,12 @@ const UniteStatsDetailPage: React.FC<{ uniteId: string; yearId: string }> = ({ u
             labels: companyJobs.map(j => j.job_name),
             datasets: [
               {
-                label: 'Current Workers',
+                label: t('Current Workers'),
                 data: companyJobs.map(j => j.current_workers),
                 backgroundColor: '#1976d2',
               },
               {
-                label: 'Max Workers',
+                label: t('Max Workers'),
                 data: companyJobs.map(j => j.max_workers),
                 backgroundColor: '#90caf9',
               },
@@ -92,11 +94,11 @@ const UniteStatsDetailPage: React.FC<{ uniteId: string; yearId: string }> = ({ u
                       font: { weight: 'bold' },
                       anchor: 'end',
                       align: 'top',
-                      formatter: (value, context) => {
+                      formatter: (_value, context) => {
                         if (context.dataset.label === 'Current Workers') {
                           const idx = context.dataIndex;
                           const job = companyJobs[idx];
-                          const missing = job.difference < 0 ? `Missing: ${-job.difference}` : '';
+                          const missing = job.difference < 0 ? `${t('Missing')}: ${-job.difference}` : '';
                           return `${job.percentage.toFixed(1)}%\n${missing}`;
                         }
                         return '';
@@ -109,11 +111,11 @@ const UniteStatsDetailPage: React.FC<{ uniteId: string; yearId: string }> = ({ u
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Job</TableCell>
-                      <TableCell align="right">Current Workers</TableCell>
-                      <TableCell align="right">Max Workers</TableCell>
-                      <TableCell align="right">Missing</TableCell>
-                      <TableCell align="right">Percentage</TableCell>
+                      <TableCell>{t('Job')}</TableCell>
+                      <TableCell align="right">{t('Current Workers')}</TableCell>
+                      <TableCell align="right">{t('Max Workers')}</TableCell>
+                      <TableCell align="right">{t('Missing')}</TableCell>
+                      <TableCell align="right">{t('Percentage')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -133,7 +135,7 @@ const UniteStatsDetailPage: React.FC<{ uniteId: string; yearId: string }> = ({ u
           );
         })}
       </Paper>
-    </Container>
+    </Box>
   );
 };
 

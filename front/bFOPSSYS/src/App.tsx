@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { 
   AppBar, Toolbar, Typography, Drawer, List, ListItemText, 
-  CssBaseline, Box, ThemeProvider, createTheme, ListItemIcon
+  CssBaseline, Box, ThemeProvider, createTheme, ListItemIcon, Button
 } from '@mui/material';
 import ListItemButton from '@mui/material/ListItemButton';
 import './App.css';
@@ -17,7 +17,6 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import LogoutIcon from '@mui/icons-material/Logout';
 
-// --- Page Imports ---
 import DashboardPage from './pages/DashboardPage';
 import JobsPage from './pages/JobsPage';
 import PersonsPage from './pages/PersonsPage';
@@ -27,8 +26,9 @@ import UniteStatsDetailPageWrapper from './pages/UniteStatsDetailPageWrapper';
 import UniteStatsDetailByStatusPage from './pages/UniteStatsDetailByStatusPage';
 import TransferPage from './pages/TransferPage';
 import GainLossPage from './pages/GainLossPage';
+import { I18nProvider, useI18n } from './i18n/translator';
 
-const drawerWidth = 260; // Widened slightly to match the design
+const drawerWidth = 300; // Widened slightly to match the design
 
 const navItems = [
   { label: 'Dashboard', path: '/', icon: <GridViewIcon /> },
@@ -55,11 +55,20 @@ const theme = createTheme({
 // We separate the layout into its own component so we can use the `useLocation` hook
 function AppLayout() {
   const location = useLocation();
+  const { language, toggleLanguage, t } = useI18n();
   const activeLabel = navItems.find(item => item.path === location.pathname)?.label
     || ((location.pathname === '/companies' || location.pathname === '/unites/create' || location.pathname === '/grades/create' || location.pathname === '/years' || location.pathname === '/quota-management') ? 'Settings' : '');
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: `${drawerWidth}px minmax(0, 1fr)`,
+        minHeight: '100vh',
+        width: '100%',
+        overflow: 'hidden',
+      }}
+    >
       <CssBaseline />
       
       {/* Sidebar Drawer */}
@@ -67,7 +76,6 @@ function AppLayout() {
         variant="permanent"
         sx={{
           width: drawerWidth,
-          flexShrink: 0,
           [`& .MuiDrawer-paper`]: { 
             width: drawerWidth, 
             boxSizing: 'border-box',
@@ -75,7 +83,10 @@ function AppLayout() {
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
             display: 'flex',
             flexDirection: 'column',
-            borderRight: 'none'
+            borderRight: 'none',
+            position: 'relative',
+            height: '100vh',
+            overflow: 'hidden',
           },
         }}
       >
@@ -118,7 +129,7 @@ function AppLayout() {
                     {item.icon}
                   </ListItemIcon>
                   <ListItemText 
-                    primary={item.label} 
+                    primary={t(item.label)} 
                     primaryTypographyProps={{ 
                       fontSize: '0.95rem', 
                       fontWeight: isActive ? 600 : 500,
@@ -139,7 +150,7 @@ function AppLayout() {
                 <HelpOutlineIcon />
               </ListItemIcon>
               <ListItemText 
-                primary="Support" 
+                primary={t('Support')} 
                 primaryTypographyProps={{ fontSize: '0.95rem', fontWeight: 500, color: '#64748B' }} 
               />
             </ListItemButton>
@@ -148,7 +159,7 @@ function AppLayout() {
                 <LogoutIcon />
               </ListItemIcon>
               <ListItemText 
-                primary="Logout" 
+                primary={t('Logout')} 
                 primaryTypographyProps={{ fontSize: '0.95rem', fontWeight: 500, color: '#64748B' }} 
               />
             </ListItemButton>
@@ -157,26 +168,29 @@ function AppLayout() {
       </Drawer>
       
       {/* Main Content Area */}
-      <Box component="main" sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+      <Box component="main" sx={{ display: 'flex', flexDirection: 'column', width: '100%', minWidth: 0, minHeight: '100vh', overflowX: 'hidden' }}>
         
         {/* Subtle Top Bar (Replacing the heavy blue AppBar) */}
         <AppBar position="sticky" elevation={0} sx={{ backgroundColor: 'transparent', color: 'text.primary', borderBottom: '1px solid #e2e8f0', bgcolor: '#fff' }}>
-          <Toolbar sx={{ justifyContent: 'space-between' }}>
+          <Toolbar sx={{ justifyContent: 'space-between', width: '100%', px: { xs: 2, sm: 3, md: 4 }, boxSizing: 'border-box', flexWrap: 'wrap', rowGap: 1.25 }}>
             {/* The page title can dynamically populate here later, or leave it blank as a spacer to match design */}
             <Typography variant="h6" fontWeight="bold">
-              {activeLabel}
+              {t(activeLabel)}
             </Typography>
             {/* Placeholder for your Search Bar and Profile Icon */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <Button size="small" variant="outlined" onClick={toggleLanguage}>
+                {language === 'en' ? 'AR' : 'EN'}
+              </Button>
               {/* Fake elements to match your screenshot layout */}
-              <Typography variant="body2" color="text.secondary">Search...</Typography>
+              <Typography variant="body2" color="text.secondary">{t('Search...')}</Typography>
               <Box sx={{ width: 32, height: 32, bgcolor: '#e2e8f0', borderRadius: '50%' }} />
             </Box>
           </Toolbar>
         </AppBar>
 
         {/* Page Content Routes */}
-        <Box sx={{ p: 4, flexGrow: 1, maxWidth: 1400, margin: '0 auto', width: '100%' }}>
+        <Box sx={{ flexGrow: 1, width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/organization" element={<OrganizationPage />} />
@@ -202,9 +216,11 @@ function AppLayout() {
 function App() {
   return (
     <ThemeProvider theme={theme}>
-      <Router>
-        <AppLayout />
-      </Router>
+      <I18nProvider>
+        <Router>
+          <AppLayout />
+        </Router>
+      </I18nProvider>
     </ThemeProvider>
   );
 }

@@ -11,6 +11,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import DownloadIcon from '@mui/icons-material/Download';
 import { api } from '../api';
+import { useI18n } from '../i18n/translator';
 import '../styles/layout.css';
 
 const tabOrder = ['companies', 'unites', 'grades', 'years', 'quotas'] as const;
@@ -29,6 +30,7 @@ function TabPanel({ value, activeTab, children }: { value: TabKey; activeTab: Ta
 }
 
 const CompaniesPanel = () => {
+  const { t } = useI18n();
   const [companies, setCompanies] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [unites, setUnites] = useState<{ id: number; name: string }[]>([]);
@@ -109,7 +111,7 @@ const CompaniesPanel = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm('Delete this company?')) {
+    if (window.confirm(t('Delete this company?'))) {
       await api.delete(`/companies/${id}/`);
       setCompanies(current => current.filter(company => company.id !== id));
     }
@@ -121,34 +123,34 @@ const CompaniesPanel = () => {
     <>
       <div className="top-grid">
         <div className="card">
-          <h2 className="card-title">New Company</h2>
-          <p className="card-subtitle">Add a new corporate entity to the system.</p>
+          <h2 className="card-title">{t('New Company')}</h2>
+          <p className="card-subtitle">{t('Add a new corporate entity to the system.')}</p>
           <button className="btn btn-primary" style={{ width: '100%' }} onClick={openNewForm}>
-            <BusinessIcon fontSize="small" /> Add Company
+            <BusinessIcon fontSize="small" /> {t('Add Company')}
           </button>
         </div>
         <div className="card">
           <div className="card-title">
-            <span>INTELLIGENT FILTERS</span>
-            <button className="text-btn" onClick={() => setFilter('')}>RESET ALL</button>
+            <span>{t('INTELLIGENT FILTERS')}</span>
+            <button className="text-btn" onClick={() => setFilter('')}>{t('RESET ALL')}</button>
           </div>
           <div className="filters-row">
             <div className="filter-group" style={{ position: 'relative' }}>
-              <label className="filter-label">Search Companies</label>
+              <label className="filter-label">{t('Search Companies')}</label>
               <SearchIcon style={{ position: 'absolute', left: '12px', top: '36px', color: '#9ca3af', fontSize: '18px' }} />
               <input
                 type="text"
                 className="filter-select"
                 style={{ paddingLeft: '36px' }}
-                placeholder="Search by name or code..."
+                placeholder={t('Search by name or code...')}
                 value={filter}
                 onChange={e => setFilter(e.target.value)}
               />
             </div>
             <div className="filter-group">
-              <label className="filter-label">Unite</label>
+              <label className="filter-label">{t('Unite')}</label>
               <select className="filter-select">
-                <option>All Unites</option>
+                <option>{t('All Unites')}</option>
                 {unites.map(unite => (
                   <option key={unite.id} value={unite.id}>{unite.name}</option>
                 ))}
@@ -161,20 +163,20 @@ const CompaniesPanel = () => {
       <div className="card">
         <div className="table-header-row">
           <div>
-            <h2 className="card-title" style={{ marginBottom: '4px' }}>Registered Companies</h2>
-            <p className="card-subtitle" style={{ margin: 0 }}>{companies.length} total companies</p>
+            <h2 className="card-title" style={{ marginBottom: '4px' }}>{t('Registered Companies')}</h2>
+            <p className="card-subtitle" style={{ margin: 0 }}>{companies.length} {t('total companies')}</p>
           </div>
-          <button className="btn btn-outline"><DownloadIcon fontSize="small" /> Export</button>
+          <button className="btn btn-outline"><DownloadIcon fontSize="small" /> {t('Export')}</button>
         </div>
 
         <table className="custom-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Code</th>
-              <th>Services Count</th>
-              <th>Created At</th>
-              <th>Actions</th>
+              <th>{t('Name')}</th>
+              <th>{t('Code')}</th>
+              <th>{t('Services Count')}</th>
+              <th>{t('Created At')}</th>
+              <th>{t('Actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -195,7 +197,7 @@ const CompaniesPanel = () => {
                     ) : (
                       <div>
                         <div style={{ fontWeight: 700 }}>0</div>
-                        <div style={{ marginTop: 4, fontSize: '12px', color: '#9ca3af' }}>No jobs assigned</div>
+                        <div style={{ marginTop: 4, fontSize: '12px', color: '#9ca3af' }}>{t('No jobs assigned')}</div>
                       </div>
                     );
                   })()}
@@ -216,27 +218,27 @@ const CompaniesPanel = () => {
       {isFormOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2 style={{ marginTop: 0, marginBottom: '24px' }}>{editing ? 'Edit Company' : 'Add Company'}</h2>
+            <h2 style={{ marginTop: 0, marginBottom: '24px' }}>{editing ? t('Edit Company') : t('Add Company')}</h2>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label>Company Name</label>
+                <label>{t('Company Name')}</label>
                 <input type="text" className="filter-select" value={form.name} onChange={e => setForm(current => ({ ...current, name: e.target.value }))} required />
               </div>
               <div className="form-group">
-                <label>Company Code</label>
+                <label>{t('Company Code')}</label>
                 <input type="text" className="filter-select" value={form.code} onChange={e => setForm(current => ({ ...current, code: e.target.value }))} required />
               </div>
               <div className="form-group">
-                <label>Unite</label>
+                <label>{t('Unite')}</label>
                 <select value={form.unite} onChange={e => setForm(current => ({ ...current, unite: e.target.value }))} required>
-                  <option value="" disabled>Select unite...</option>
+                  <option value="" disabled>{t('Select unite...')}</option>
                   {unites.map(unite => <option key={unite.id} value={unite.id}>{unite.name}</option>)}
                 </select>
               </div>
               {error && <p style={{ color: '#ef4444', fontSize: '12px' }}>{error}</p>}
               <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={closeForm}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editing ? 'Update' : 'Save'}</button>
+                <button type="button" className="btn btn-outline" onClick={closeForm}>{t('Cancel')}</button>
+                <button type="submit" className="btn btn-primary">{editing ? t('Update') : t('Save')}</button>
               </div>
             </form>
           </div>
@@ -247,6 +249,7 @@ const CompaniesPanel = () => {
 };
 
 const UnitesPanel = () => {
+  const { t } = useI18n();
   const [unites, setUnites] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -301,7 +304,7 @@ const UnitesPanel = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm('Delete this unite?')) {
+    if (window.confirm(t('Delete this unite?'))) {
       await api.delete(`/unites/${id}/`);
       setUnites(current => current.filter(unite => unite.id !== id));
     }
@@ -311,25 +314,25 @@ const UnitesPanel = () => {
     <>
       <div className="top-grid" style={{ gridTemplateColumns: '300px' }}>
         <div className="card">
-          <h2 className="card-title">New Unite</h2>
-          <p className="card-subtitle">Create a new organizational structure unit.</p>
+          <h2 className="card-title">{t('New Unite')}</h2>
+          <p className="card-subtitle">{t('Create a new organizational structure unit.')}</p>
           <button className="btn btn-primary" style={{ width: '100%' }} onClick={openNewForm}>
-            <AccountTreeIcon fontSize="small" /> Add Unite
+            <AccountTreeIcon fontSize="small" /> {t('Add Unite')}
           </button>
         </div>
       </div>
 
       <div className="card">
         <div className="table-header-row">
-          <h2 className="card-title" style={{ marginBottom: '4px' }}>Registered Unites</h2>
+          <h2 className="card-title" style={{ marginBottom: '4px' }}>{t('Registered Unites')}</h2>
         </div>
 
         <table className="custom-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Code</th>
-              <th style={{ width: '100px' }}>Actions</th>
+              <th>{t('Name')}</th>
+              <th>{t('Code')}</th>
+              <th style={{ width: '100px' }}>{t('Actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -352,20 +355,20 @@ const UnitesPanel = () => {
       {isFormOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2 style={{ marginTop: 0, marginBottom: '24px' }}>{editing ? 'Edit Unite' : 'Create Unite'}</h2>
+            <h2 style={{ marginTop: 0, marginBottom: '24px' }}>{editing ? t('Edit Unite') : t('Create Unite')}</h2>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label>Unite Name</label>
+                <label>{t('Unite Name')}</label>
                 <input type="text" className="filter-select" value={form.name} onChange={e => setForm(current => ({ ...current, name: e.target.value }))} required />
               </div>
               <div className="form-group">
-                <label>Unite Code</label>
+                <label>{t('Unite Code')}</label>
                 <input type="text" className="filter-select" value={form.code} onChange={e => setForm(current => ({ ...current, code: e.target.value }))} required />
               </div>
               {error && <p style={{ color: '#ef4444', fontSize: '12px' }}>{error}</p>}
               <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={closeForm}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editing ? 'Update' : 'Save'}</button>
+                <button type="button" className="btn btn-outline" onClick={closeForm}>{t('Cancel')}</button>
+                <button type="submit" className="btn btn-primary">{editing ? t('Update') : t('Save')}</button>
               </div>
             </form>
           </div>
@@ -376,6 +379,7 @@ const UnitesPanel = () => {
 };
 
 const GradesPanel = () => {
+  const { t } = useI18n();
   const [grades, setGrades] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -430,7 +434,7 @@ const GradesPanel = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm('Delete this grade?')) {
+    if (window.confirm(t('Delete this grade?'))) {
       await api.delete(`/grades/${id}/`);
       setGrades(current => current.filter(grade => grade.id !== id));
     }
@@ -440,25 +444,25 @@ const GradesPanel = () => {
     <>
       <div className="top-grid" style={{ gridTemplateColumns: '300px' }}>
         <div className="card">
-          <h2 className="card-title">New Grade</h2>
-          <p className="card-subtitle">Define a new employee seniority grade.</p>
+          <h2 className="card-title">{t('New Grade')}</h2>
+          <p className="card-subtitle">{t('Define a new employee seniority grade.')}</p>
           <button className="btn btn-primary" style={{ width: '100%' }} onClick={openNewForm}>
-            <StarIcon fontSize="small" /> Add Grade
+            <StarIcon fontSize="small" /> {t('Add Grade')}
           </button>
         </div>
       </div>
 
       <div className="card">
         <div className="table-header-row">
-          <h2 className="card-title" style={{ marginBottom: '4px' }}>Grades Dictionary</h2>
+          <h2 className="card-title" style={{ marginBottom: '4px' }}>{t('Grades Dictionary')}</h2>
         </div>
 
         <table className="custom-table">
           <thead>
             <tr>
-              <th>Grade Name</th>
-              <th>Reference Code</th>
-              <th style={{ width: '100px' }}>Actions</th>
+              <th>{t('Grade Name')}</th>
+              <th>{t('Reference Code')}</th>
+              <th style={{ width: '100px' }}>{t('Actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -481,20 +485,20 @@ const GradesPanel = () => {
       {isFormOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2 style={{ marginTop: 0, marginBottom: '24px' }}>{editing ? 'Edit Grade' : 'Create Grade'}</h2>
+            <h2 style={{ marginTop: 0, marginBottom: '24px' }}>{editing ? t('Edit Grade') : t('Create Grade')}</h2>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label>Grade Name</label>
+                <label>{t('Grade Name')}</label>
                 <input type="text" className="filter-select" value={form.name} onChange={e => setForm(current => ({ ...current, name: e.target.value }))} required />
               </div>
               <div className="form-group">
-                <label>Grade Code</label>
+                <label>{t('Grade Code')}</label>
                 <input type="text" className="filter-select" value={form.code} onChange={e => setForm(current => ({ ...current, code: e.target.value }))} required />
               </div>
               {error && <p style={{ color: '#ef4444', fontSize: '12px' }}>{error}</p>}
               <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={closeForm}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editing ? 'Update' : 'Save'}</button>
+                <button type="button" className="btn btn-outline" onClick={closeForm}>{t('Cancel')}</button>
+                <button type="submit" className="btn btn-primary">{editing ? t('Update') : t('Save')}</button>
               </div>
             </form>
           </div>
@@ -505,6 +509,7 @@ const GradesPanel = () => {
 };
 
 const YearsPanel = () => {
+  const { t } = useI18n();
   const [years, setYears] = useState<any[]>([]);
   const [filter, setFilter] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -556,7 +561,7 @@ const YearsPanel = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm('Delete this fiscal year?')) {
+    if (window.confirm(t('Delete this fiscal year?'))) {
       await api.delete(`/years/${id}/`);
       void fetchYears();
     }
@@ -566,26 +571,26 @@ const YearsPanel = () => {
     <>
       <div className="top-grid">
         <div className="card">
-          <h2 className="card-title">New Fiscal Year</h2>
-          <p className="card-subtitle">Initialize a new financial year and total quotas.</p>
+          <h2 className="card-title">{t('New Fiscal Year')}</h2>
+          <p className="card-subtitle">{t('Initialize a new financial year and total quotas.')}</p>
           <button className="btn btn-primary" style={{ width: '100%' }} onClick={openNewForm}>
-            <CalendarTodayIcon fontSize="small" /> Add Year
+            <CalendarTodayIcon fontSize="small" /> {t('Add Year')}
           </button>
         </div>
         <div className="card">
           <div className="card-title">
-            <span>FISCAL YEAR FILTERS</span>
-            <button className="text-btn" onClick={() => setFilter('')}>RESET ALL</button>
+            <span>{t('FISCAL YEAR FILTERS')}</span>
+            <button className="text-btn" onClick={() => setFilter('')}>{t('RESET ALL')}</button>
           </div>
           <div className="filters-row">
             <div className="filter-group" style={{ position: 'relative' }}>
-              <label className="filter-label">Search Years</label>
+              <label className="filter-label">{t('Search Years')}</label>
               <SearchIcon style={{ position: 'absolute', left: '12px', top: '36px', color: '#9ca3af', fontSize: '18px' }} />
               <input
                 type="text"
                 className="filter-select"
                 style={{ paddingLeft: '36px' }}
-                placeholder="Search years..."
+                placeholder={t('Search years...')}
                 value={filter}
                 onChange={e => setFilter(e.target.value)}
               />
@@ -597,19 +602,19 @@ const YearsPanel = () => {
       <div className="card">
         <div className="table-header-row">
           <div>
-            <h2 className="card-title" style={{ marginBottom: '4px' }}>Year Registries</h2>
-            <p className="card-subtitle" style={{ margin: 0 }}>{years.length} total years</p>
+            <h2 className="card-title" style={{ marginBottom: '4px' }}>{t('Year Registries')}</h2>
+            <p className="card-subtitle" style={{ margin: 0 }}>{years.length} {t('total years')}</p>
           </div>
         </div>
 
         <table className="custom-table">
           <thead>
             <tr>
-              <th>Year</th>
-              <th>Total Quota</th>
-              <th>Status</th>
-              <th>Created At</th>
-              <th>Actions</th>
+              <th>{t('Year')}</th>
+              <th>{t('Total Quota')}</th>
+              <th>{t('Status')}</th>
+              <th>{t('Created At')}</th>
+              <th>{t('Actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -619,7 +624,7 @@ const YearsPanel = () => {
                 <td>{year.total_quota}</td>
                 <td>
                   <span className={`status-pill ${year.is_closed ? 'intern' : 'permanent'}`}>
-                    {year.is_closed ? 'Closed' : 'Active'}
+                    {year.is_closed ? t('Closed') : t('Active')}
                   </span>
                 </td>
                 <td>{year.created_at ? new Date(year.created_at).toLocaleDateString() : '-'}</td>
@@ -638,23 +643,23 @@ const YearsPanel = () => {
       {isFormOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2 style={{ marginTop: 0, marginBottom: '24px' }}>{editing ? 'Edit Year' : 'Add Year'}</h2>
+            <h2 style={{ marginTop: 0, marginBottom: '24px' }}>{editing ? t('Edit Year') : t('Add Year')}</h2>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label>Fiscal Year</label>
+                <label>{t('Fiscal Year')}</label>
                 <input type="number" className="filter-select" value={form.year} onChange={e => setForm(current => ({ ...current, year: e.target.value }))} required />
               </div>
               <div className="form-group">
-                <label>Total Quota</label>
+                <label>{t('Total Quota')}</label>
                 <input type="number" className="filter-select" value={form.total_quota} onChange={e => setForm(current => ({ ...current, total_quota: e.target.value }))} required />
               </div>
               <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '8px' }}>
                 <input type="checkbox" checked={form.is_closed} onChange={e => setForm(current => ({ ...current, is_closed: e.target.checked }))} id="closedCheck" />
-                <label htmlFor="closedCheck" style={{ margin: 0 }}>Is Closed?</label>
+                <label htmlFor="closedCheck" style={{ margin: 0 }}>{t('Is Closed?')}</label>
               </div>
               <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={closeForm}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editing ? 'Update' : 'Save'}</button>
+                <button type="button" className="btn btn-outline" onClick={closeForm}>{t('Cancel')}</button>
+                <button type="submit" className="btn btn-primary">{editing ? t('Update') : t('Save')}</button>
               </div>
             </form>
           </div>
@@ -665,6 +670,7 @@ const YearsPanel = () => {
 };
 
 const QuotasPanel = () => {
+  const { t } = useI18n();
   const [quotas, setQuotas] = useState<any[]>([]);
   const [years, setYears] = useState<{ id: number; year: number }[]>([]);
   const [unites, setUnites] = useState<{ id: number; name: string }[]>([]);
@@ -735,7 +741,7 @@ const QuotasPanel = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm('Delete this quota?')) {
+    if (window.confirm(t('Delete this quota?'))) {
       await api.delete(`/unite-quotas/${id}/`);
       void fetchQuotas();
     }
@@ -744,35 +750,35 @@ const QuotasPanel = () => {
   return (
     <>
       <Dialog open={showPopup} onClose={() => setShowPopup(false)}>
-        <DialogTitle>Quota Exceeded</DialogTitle>
+        <DialogTitle>{t('Quota Exceeded')}</DialogTitle>
         <DialogContent>{popupMsg}</DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowPopup(false)}>OK</Button>
+          <Button onClick={() => setShowPopup(false)}>{t('OK')}</Button>
         </DialogActions>
       </Dialog>
 
       <div className="top-grid" style={{ gridTemplateColumns: '300px' }}>
         <div className="card">
-          <h2 className="card-title">Assign Quota</h2>
-          <p className="card-subtitle">Allocate hiring quotas to specific Unites.</p>
+          <h2 className="card-title">{t('Assign Quota')}</h2>
+          <p className="card-subtitle">{t('Allocate hiring quotas to specific Unites.')}</p>
           <button className="btn btn-primary" style={{ width: '100%' }} onClick={openNewForm}>
-            <PieChartIcon fontSize="small" /> Add Quota
+            <PieChartIcon fontSize="small" /> {t('Add Quota')}
           </button>
         </div>
       </div>
 
       <div className="card">
         <div className="table-header-row">
-          <h2 className="card-title" style={{ marginBottom: '4px' }}>Allocated Quotas</h2>
+          <h2 className="card-title" style={{ marginBottom: '4px' }}>{t('Allocated Quotas')}</h2>
         </div>
 
         <table className="custom-table">
           <thead>
             <tr>
-              <th>Fiscal Year</th>
-              <th>Business Unite</th>
-              <th>Quota Limit</th>
-              <th style={{ width: '100px' }}>Actions</th>
+              <th>{t('Fiscal Year')}</th>
+              <th>{t('Business Unite')}</th>
+              <th>{t('Quota Limit')}</th>
+              <th style={{ width: '100px' }}>{t('Actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -796,29 +802,29 @@ const QuotasPanel = () => {
       {isFormOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2 style={{ marginTop: 0, marginBottom: '24px' }}>{editing ? 'Edit Quota' : 'Assign Quota'}</h2>
+            <h2 style={{ marginTop: 0, marginBottom: '24px' }}>{editing ? t('Edit Quota') : t('Assign Quota')}</h2>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label>Fiscal Year</label>
+                <label>{t('Fiscal Year')}</label>
                 <select value={form.year} onChange={e => setForm(current => ({ ...current, year: e.target.value }))} required>
-                  <option value="" disabled>Select Year...</option>
+                  <option value="" disabled>{t('Select Year...')}</option>
                   {years.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
                 </select>
               </div>
               <div className="form-group">
-                <label>Unite</label>
+                <label>{t('Unite')}</label>
                 <select value={form.unite} onChange={e => setForm(current => ({ ...current, unite: e.target.value }))} required>
-                  <option value="" disabled>Select Unite...</option>
+                  <option value="" disabled>{t('Select Unite...')}</option>
                   {unites.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
               </div>
               <div className="form-group">
-                <label>Quota Count</label>
+                <label>{t('Quota Count')}</label>
                 <input type="number" className="filter-select" value={form.quota} onChange={e => setForm(current => ({ ...current, quota: e.target.value }))} required />
               </div>
               <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={closeForm}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editing ? 'Update' : 'Save'}</button>
+                <button type="button" className="btn btn-outline" onClick={closeForm}>{t('Cancel')}</button>
+                <button type="submit" className="btn btn-primary">{editing ? t('Update') : t('Save')}</button>
               </div>
             </form>
           </div>
@@ -829,6 +835,7 @@ const QuotasPanel = () => {
 };
 
 const OrganizationPage: React.FC = () => {
+  const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
   const activeTab: TabKey = isTabKey(requestedTab) ? requestedTab : 'companies';
@@ -841,8 +848,8 @@ const OrganizationPage: React.FC = () => {
     <div className="assignments-page-container">
       <header className="page-header">
         <div className="page-title">
-          <h1>Organization Setup</h1>
-          <span className="breadcrumb">Settings &gt; <span className="breadcrumb-active">Companies, Unites, Grades, Years &amp; Quotas</span></span>
+          <h1>{t('Organization Setup')}</h1>
+          <span className="breadcrumb">{t('Settings')} &gt; <span className="breadcrumb-active">{t('Companies, Unites, Grades, Years & Quotas')}</span></span>
         </div>
       </header>
 
@@ -856,11 +863,11 @@ const OrganizationPage: React.FC = () => {
           indicatorColor="primary"
           sx={{ minHeight: 48 }}
         >
-          <Tab value="companies" label="Companies" />
-          <Tab value="unites" label="Unites" />
-          <Tab value="grades" label="Grades" />
-          <Tab value="years" label="Years" />
-          <Tab value="quotas" label="Quotas" />
+          <Tab value="companies" label={t('Companies')} />
+          <Tab value="unites" label={t('Unites')} />
+          <Tab value="grades" label={t('Grades')} />
+          <Tab value="years" label={t('Years')} />
+          <Tab value="quotas" label={t('Quotas')} />
         </Tabs>
       </div>
 
