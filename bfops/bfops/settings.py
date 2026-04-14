@@ -1,8 +1,8 @@
-# Redis cache configuration
+# Django's built-in local memory cache configuration
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
+        'LOCATION': 'dashboard-cache',
     }
 }
 """

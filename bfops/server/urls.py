@@ -16,17 +16,15 @@ router.register(r'gains', views.GainViewSet, basename='gain')
 router.register(r'losses', views.LossViewSet, basename='loss')
 
 urlpatterns = [
-    # Automatically maps all ViewSet routes (CRUD + bulk actions)
     path('', include(router.urls)),
 
-    # Custom Actions & Statistics
     path('transfers-execute/', views.execute_transfer, name='execute-transfer'),
+    path('transfers-suggestions/', views.transfer_suggestions, name='transfer-suggestions'),
     
     path('stats/jobs/', views.JobStatsView.as_view(), name='job-stats'),
     path('stats/unites/', views.UniteStatsView.as_view(), name='unite-stats'),
     path('stats/companies/', views.company_stats_view, name='company-stats'),
 
-    # Alternate Aliases
     path('job-statistics/', views.JobStatsView.as_view(), name='job-statistics'),
     path('service-statistics/', views.UniteStatsView.as_view(), name='service-statistics'),
     path('company-statistics/', views.company_stats_view, name='company-statistics'),

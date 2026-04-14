@@ -22,9 +22,7 @@ from .serializers import (
 )
 
 class IsAdminUserRole(BasePermission):
-    """
-    Allows access only to users with role='admin'.
-    """
+
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated and getattr(request.user, 'role', '') == 'admin')
 
@@ -138,8 +136,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             access_token = response.data.get('access')
             refresh_token = response.data.get('refresh')
             
-            # Remove tokens from response body for security, or keep them if needed
-            # For strict HttpOnly, it's better to remove them from body
+
             response.set_cookie(
                 key=settings.SIMPLE_JWT['AUTH_COOKIE'],
                 value=access_token,
@@ -156,17 +153,14 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
                 samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
             )
-            # You can clear the body tokens if you strictly want them only in cookies
-            # response.data = {"message": "Login successful"}
+
         return response
 
 class CustomTokenRefreshView(TokenRefreshView):
     def post(self, request, *args, **kwargs):
         refresh_cookie = request.COOKIES.get(settings.SIMPLE_JWT.get('AUTH_COOKIE_REFRESH', 'refresh'))
         
-        # If refresh token cookie exists, we add it to the request data
         if refresh_cookie:
-            # request.data is immutable; we must copy it or pass directly to serializer
             data = request.data.copy()
             data['refresh'] = refresh_cookie
             request._full_data = data
@@ -185,7 +179,6 @@ class CustomTokenRefreshView(TokenRefreshView):
                 samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
             )
 
-            # When refresh rotation is enabled, persist the new refresh token in cookie.
             if rotated_refresh_token:
                 response.set_cookie(
                     key=settings.SIMPLE_JWT['AUTH_COOKIE_REFRESH'],
@@ -209,7 +202,6 @@ class LogoutView(APIView):
                 token = RefreshToken(refresh_token)
                 token.blacklist()
             except TokenError:
-                # Ignore invalid/expired refresh token and continue clearing cookies.
                 pass
 
         response = Response({"message": "Logout successful"}, status=status.HTTP_200_OK)

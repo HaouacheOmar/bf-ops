@@ -56,7 +56,6 @@ export const createCompany = (data: any) => api.post('/companies/', data);
 export const updateCompany = (id: number, data: any) => api.put(`/companies/${id}/`, data);
 export const deleteCompany = (id: number) => api.delete(`/companies/${id}/`);
 
-// Add similar functions for services, jobs, years, persons, assignments as needed
 
 // Unites
 export const createUnite = (data: any) => api.post('/unites/', data);

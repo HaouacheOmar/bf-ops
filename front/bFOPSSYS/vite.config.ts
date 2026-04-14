@@ -9,6 +9,8 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] })
   ],
   server: {
+    host: '0.0.0.0', // Allows the server to be accessed via local DNS aliases like BFopsHR
+    allowedHosts: ['bfopshr', 'BFopsHR'], // Explicitly allow the new custom host
     proxy: {
       '/api': 'http://localhost:8000',
     },

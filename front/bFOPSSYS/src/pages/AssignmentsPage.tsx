@@ -9,7 +9,7 @@ import PersonAddAlt1Icon from '@mui/icons-material/PersonAddAlt1';
 import SearchIcon from '@mui/icons-material/Search';
 import { getJobs } from '../api-jobs';
 import { useI18n } from '../i18n/translator';
-import '../styles/layout.css'; // <--- Check CSS path!
+import '../styles/layout.css';
 
 interface Assignment {
   id: number;
@@ -33,16 +33,14 @@ const AssignmentsPage = () => {
   const [allJobs, setAllJobs] = useState<any[]>([]);
   const [filter, setFilter] = useState('');
   
-  // Intelligent Filters State
   const [personFilter, setPersonFilter] = useState('');
   const [jobFilter, setJobFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [contractTypeFilter, setContractTypeFilter] = useState('');
   
-  // Modal & Form State
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<Assignment | null>(null);
-  const [form, setForm] = useState({ person: '', job: '', year: '', contract_type: 'permanent' });
+  const [form, setForm] = useState({ person: '', job: '', year: '' });
   
   const [gradePopup, setGradePopup] = useState(false);
   const [gradePopupMsg, setGradePopupMsg] = useState('');
@@ -98,7 +96,7 @@ const AssignmentsPage = () => {
 
   const openNewForm = () => {
     setEditing(null);
-    setForm({ person: '', job: '', year: '', contract_type: 'permanent' });
+    setForm({ person: '', job: '', year: '' });
     setIsFormOpen(true);
   };
 
@@ -128,11 +126,9 @@ const AssignmentsPage = () => {
       };
 
       if (editing) {
-        // OPTIMISTIC UPDATE: Update local state immediately
         const res = await axios.put(`/api/assignments/${editing.id}/`, payload);
         setAssignments(assignments.map(a => a.id === editing.id ? res.data : a));
       } else {
-        // OPTIMISTIC UPDATE: Append to local state immediately
         const res = await axios.post('/api/assignments/', payload);
         setAssignments([...assignments, res.data]);
       }
@@ -147,8 +143,7 @@ const AssignmentsPage = () => {
     setForm({ 
       person: String(a.person), 
       job: String(a.job), 
-      year: String(a.year), 
-      contract_type: a.contract_type 
+      year: String(a.year)
     });
     setIsFormOpen(true);
   };
@@ -156,12 +151,10 @@ const AssignmentsPage = () => {
   const handleDelete = async (id: number) => {
     if(window.confirm("Remove this assignment?")) {
       await axios.delete(`/api/assignments/${id}/`);
-      // OPTIMISTIC UPDATE: Remove from local state immediately
       setAssignments(assignments.filter(a => a.id !== id));
     }
   };
 
-  // UI Helpers
   const getInitials = (name: string) => {
     if (!name) return '??';
     const parts = name.split(' ');
@@ -182,7 +175,6 @@ const AssignmentsPage = () => {
   };
 
   const handleExport = () => {
-    // Prepare data for export
     const exportData = assignments.map(a => ({
       'Resource Name': a.person_name,
       'Employee ID': `EMP-${a.person}`,
@@ -194,28 +186,24 @@ const AssignmentsPage = () => {
       'Created Date': new Date(a.created_at).toLocaleDateString(),
     }));
 
-    // Create workbook and worksheet
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Assignments');
 
-    // Style the header row (optional - adds some formatting)
     const colWidths = [
-      { wch: 20 }, // Resource Name
-      { wch: 15 }, // Employee ID
-      { wch: 20 }, // Company
-      { wch: 20 }, // Job Title
-      { wch: 15 }, // Fiscal Year
-      { wch: 15 }, // Contract Type
-      { wch: 18 }, // Status
-      { wch: 15 }, // Created Date
+      { wch: 20 }, 
+      { wch: 15 }, 
+      { wch: 20 }, 
+      { wch: 20 }, 
+      { wch: 15 }, 
+      { wch: 15 }, 
+      { wch: 18 }, 
+      { wch: 15 }, 
     ];
     worksheet['!cols'] = colWidths;
 
-    // Generate filename with current date
     const filename = `Assignments_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
 
-    // Write file
     XLSX.writeFile(workbook, filename);
   };
 
@@ -416,14 +404,6 @@ const AssignmentsPage = () => {
                 <select value={form.year} onChange={e => setForm(f => ({ ...f, year: e.target.value }))} required>
                   <option value="" disabled>{t('Select Year...')}</option>
                   {years.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>{t('Contract Type')}</label>
-                <select value={form.contract_type} onChange={e => setForm(f => ({ ...f, contract_type: e.target.value }))} required>
-                  <option value="permanent">{t('Permanent')}</option>
-                  <option value="temporary">{t('Temporary')}</option>
-                  <option value="intern">{t('Intern')}</option>
                 </select>
               </div>
               <div className="modal-actions">

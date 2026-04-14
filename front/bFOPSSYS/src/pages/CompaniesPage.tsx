@@ -12,7 +12,7 @@ interface Company {
   id: number;
   name: string;
   code: string;
-  services_count?: number; // matched from your table mapping
+  services_count?: number; 
   created_at: string;
   unite?: number;
 }
@@ -23,7 +23,6 @@ const CompaniesPage = () => {
   const [unites, setUnites] = useState<{ id: number; name: string }[]>([]);
   const [filter, setFilter] = useState('');
   
-  // Modal & Form State
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<Company | null>(null);
   const [form, setForm] = useState({ name: '', code: '', unite: '' });
@@ -39,7 +38,6 @@ const CompaniesPage = () => {
   useEffect(() => {
     fetchCompanies();
     axios.get('/api/unites/').then(res => setUnites(res.data.results || res.data));
-    // eslint-disable-next-line
   }, [filter]);
 
   const openNewForm = () => {
@@ -57,11 +55,9 @@ const CompaniesPage = () => {
     e.preventDefault();
     try {
       if (editing) {
-        // OPTIMISTIC UPDATE: Update array immediately
         const res = await axios.put(`/api/companies/${editing.id}/`, form);
         setCompanies(companies.map(c => c.id === editing.id ? res.data : c));
       } else {
-        // OPTIMISTIC UPDATE: Append immediately
         const res = await axios.post('/api/companies/', form);
         setCompanies([...companies, res.data]);
       }
@@ -80,7 +76,6 @@ const CompaniesPage = () => {
   const handleDelete = async (id: number) => {
     if(window.confirm(t('Delete this company?'))) {
       await axios.delete(`/api/companies/${id}/`);
-      // OPTIMISTIC UPDATE: Filter array immediately
       setCompanies(companies.filter(c => c.id !== id));
     }
   };

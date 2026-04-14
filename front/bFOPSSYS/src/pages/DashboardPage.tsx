@@ -17,31 +17,47 @@ const DashboardPage = () => {
   const navigate = useNavigate();
   const { t } = useI18n();
 
-  // Filter States
-  const [year, setYear] = useState<string>('');
-  const [unite, setUnite] = useState<string>('');
-  const [company, setCompany] = useState<string>('');
-  const [selectedJob, setSelectedJob] = useState<string>('all');
+  const [year, setYear] = useState<string>(() => sessionStorage.getItem('dashboard_year') || '');
+  const [unite, setUnite] = useState<string>(() => sessionStorage.getItem('dashboard_unite') || '');
+  const [company, setCompany] = useState<string>(() => sessionStorage.getItem('dashboard_company') || '');
+  const [selectedJob, setSelectedJob] = useState<string>(() => sessionStorage.getItem('dashboard_selectedJob') || 'all');
 
-  // Options States
   const [years, setYears] = useState<Year[]>([]);
   const [unites, setUnites] = useState<Unite[]>([]);
   const [allCompanies, setAllCompanies] = useState<any[]>([]);
   const [allJobs, setAllJobs] = useState<any[]>([]);
   
-  // Data States
   const [jobStats, setJobStats] = useState<any[]>([]);
   const [companyStats, setCompanyStats] = useState<any[]>([]);
 
-  // Initial Fetch for Dropdowns
+  // Persist filters to session storage when they change
   useEffect(() => {
-    axios.get('/api/years/').then(res => setYears(res.data.results || res.data));
+    sessionStorage.setItem('dashboard_year', year);
+    sessionStorage.setItem('dashboard_unite', unite);
+    sessionStorage.setItem('dashboard_company', company);
+    sessionStorage.setItem('dashboard_selectedJob', selectedJob);
+  }, [year, unite, company, selectedJob]);
+
+  useEffect(() => {
+    axios.get('/api/years/').then(res => {
+      const fetchedYears = res.data.results || res.data;
+      setYears(fetchedYears);
+      
+      // Auto-select current year if none is selected
+      const savedYear = sessionStorage.getItem('dashboard_year');
+      if (!savedYear) {
+        const currentYearValue = new Date().getFullYear();
+        const found = fetchedYears.find((y: Year) => y.year === currentYearValue);
+        if (found) {
+          setYear(String(found.id));
+        }
+      }
+    });
     axios.get('/api/unites/').then(res => setUnites(res.data.results || res.data));
     axios.get('/api/companies/').then(res => setAllCompanies(res.data.results || res.data));
     axios.get('/api/jobs/').then(res => setAllJobs(res.data.results || res.data));
   }, []);
 
-  // Fetch Stats when Filters Change
   useEffect(() => {
     if (year) {
       const params: any = { year_id: year };
@@ -57,7 +73,6 @@ const DashboardPage = () => {
     }
   }, [year, unite, company, selectedJob]);
 
-  // Dropdown Filtering Logic
   const filteredCompanies = unite 
     ? allCompanies.filter((c: any) => String(c.unite) === String(unite)) 
     : allCompanies;
@@ -70,16 +85,56 @@ const DashboardPage = () => {
     filteredDropdownJobs = allJobs.filter((j: any) => validCompanyIds.includes(String(j.company)));
   }
 
-  // Frontend redundancy filtering for Job Stats
   let filteredJobStats = jobStats;
+  if (unite) {
+    filteredJobStats = filteredJobStats.filter(j => String(j.unite_id) === String(unite));
+  }
   if (company) {
     filteredJobStats = filteredJobStats.filter(j => String(j.company_id) === String(company));
   }
   if (selectedJob !== 'all') {
     filteredJobStats = filteredJobStats.filter(j => String(j.job_id) === String(selectedJob));
+  } else if (unite && !company) {
+    const aggregatedByJobName: Record<string, any> = {};
+
+    filteredJobStats.forEach((job: any) => {
+      const key = (job.job_name || '').trim().toLowerCase();
+      if (!aggregatedByJobName[key]) {
+        aggregatedByJobName[key] = {
+          job_id: job.job_id,
+          job_name: job.job_name,
+          company_id: null,
+          unite_id: job.unite_id,
+          current_workers: 0,
+          max_workers: 0,
+        };
+      }
+
+      aggregatedByJobName[key].current_workers += Number(job.current_workers) || 0;
+      aggregatedByJobName[key].max_workers += Number(job.max_workers) || 0;
+    });
+
+    filteredJobStats = Object.values(aggregatedByJobName).map((item: any) => {
+      const difference = item.current_workers - item.max_workers;
+      const percentage = item.max_workers > 0
+        ? (difference / item.max_workers) * 100
+        : 0;
+
+      return {
+        ...item,
+        difference,
+        percentage,
+        status: (
+          difference < 0
+            ? 'deficit'
+            : difference > 0
+              ? 'surplus'
+              : 'balanced'
+        ),
+      };
+    });
   }
 
-  // --- JOB CHART LOGIC ---
   const handleJobPieClick = (_event: any, elements: any) => {
     if (!elements.length) return;
     const idx = elements[0].index;
@@ -96,7 +151,7 @@ const DashboardPage = () => {
   };
 
   const jobBarData = {
-    labels: filteredJobStats.map(j => j.job_name),
+    labels: filteredJobStats.map(j => [j.job_name, j.company_name || '']),
     datasets: [
       {
         label: t('Current Workers'),
@@ -149,7 +204,6 @@ const DashboardPage = () => {
     onClick: handleJobPieClick, 
   };
 
-  // --- COMPANY CHART LOGIC ---
   const companyBarData = {
     labels: companyStats.map(c => c.company_name),
     datasets: [

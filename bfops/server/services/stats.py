@@ -2,10 +2,8 @@ from django.db.models import Count
 from ..models import Assignment, Job
 
 def job_statistics(year_id):
-    """
-    Returns a list of job stats for the given year, including deficit/surplus/balanced status.
-    """
-    jobs = Job.objects.select_related("company__unite").all()
+
+    jobs = Job.objects.select_related("company__unite").exclude(name__iexact="En attente d'affectation")
     job_counts = dict(
         Assignment.objects
         .filter(year_id=year_id)
@@ -22,6 +20,7 @@ def job_statistics(year_id):
             "job_id": job.id,
             "job_name": job.name,
             "company_id": job.company.id if job.company else None,
+            "company_name": job.company.name if job.company else None,
             "unite_id": job.company.unite_id if job.company else None,
             "unite_name": job.company.unite.name if job.company and job.company.unite else None,
             "current_workers": current,
@@ -40,7 +39,7 @@ def unite_statistics(year_id):
     """
     Returns a list of unite stats for the given year, aggregating jobs in each unite.
     """
-    jobs = Job.objects.select_related("company__unite").all()
+    jobs = Job.objects.select_related("company__unite").exclude(name__iexact="En attente d'affectation")
     job_counts = dict(
         Assignment.objects
         .filter(year_id=year_id)
@@ -106,7 +105,7 @@ def company_statistics(year_id):
     """
     Returns a list of company stats for the given year, aggregating jobs in each company.
     """
-    jobs = Job.objects.select_related("company__unite").all()
+    jobs = Job.objects.select_related("company__unite").exclude(name__iexact="En attente d'affectation")
     company_map = {}
     
     for job in jobs:

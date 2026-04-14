@@ -21,6 +21,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import MenuIcon from '@mui/icons-material/Menu';
+import settingsSvg from './assets/settings-svgrepo-com.svg';
 
 import DashboardPage from './pages/DashboardPage';
 import JobsPage from './pages/JobsPage';
@@ -40,7 +41,6 @@ const drawerWidth = 300; // Widened slightly to match the design
 
 const navItemsOriginal = [
   { label: 'Dashboard', path: '/', icon: <GridViewIcon /> },
-  { label: 'Settings', path: '/organization', icon: <BusinessIcon />, adminOnly: true },
   { label: 'Jobs', path: '/jobs', icon: <WorkOutlineIcon />, adminOnly: true },
   { label: 'Persons', path: '/persons', icon: <PeopleAltOutlinedIcon />, adminOnly: true },
   { label: 'Assignments', path: '/assignments', icon: <AssignmentOutlinedIcon />, adminOnly: true },
@@ -121,12 +121,18 @@ function AppLayout() {
                   backgroundColor: isActive ? 'rgba(49, 78, 231, 0.04)' : 'transparent',
                   '&:hover': {
                     backgroundColor: 'rgba(49, 78, 231, 0.08)',
+                    '& svg': {
+                      transform: 'rotate(360deg)'
+                    }
                   }
                 }}
               >
                 <ListItemIcon sx={{
                   minWidth: 40,
-                  color: isActive ? 'primary.main' : '#64748B'
+                  color: isActive ? 'primary.main' : '#64748B',
+                  '& svg': {
+                    transition: 'transform 0.5s ease-in-out'
+                  }
                 }}>
                   {item.icon}
                 </ListItemIcon>
@@ -144,26 +150,62 @@ function AppLayout() {
         </List>
       </Box>
 
-      {/* Bottom Actions (Support & Logout) */}
+      {/* Bottom Actions (Settings & Logout) */}
       <Box sx={{ pb: 3 }}>
         <List>
-          <ListItemButton sx={{ pl: 3, py: 1.2 }} onClick={handleCloseMobileDrawer}>
-            <ListItemIcon sx={{ minWidth: 40, color: '#64748B' }}>
-              <HelpOutlineIcon />
-            </ListItemIcon>
-            <ListItemText
-              primary={t('Support')}
-              primaryTypographyProps={{ fontSize: '0.95rem', fontWeight: 500, color: '#64748B' }}
-            />
-          </ListItemButton>
+          {user?.role === 'admin' && (
+            <ListItemButton 
+              component={Link} 
+              to="/organization" 
+              sx={{ 
+                pl: 3, 
+                py: 1.2,
+                '&:hover .settings-icon': {
+                  transform: 'rotate(360deg)'
+                }
+              }} 
+              onClick={handleCloseMobileDrawer}
+            >
+              <ListItemIcon sx={{ minWidth: 40, color: '#64748B' }}>
+                <Box
+                  component="img"
+                  className="settings-icon"
+                  src={settingsSvg}
+                  alt="Settings"
+                  sx={{
+                    width: 24,
+                    height: 24,
+                    opacity: 0.8, // Make it look closer to MUI primary icons
+                    transition: 'transform 0.5s ease-in-out'
+                  }}
+                />
+              </ListItemIcon>
+              <ListItemText
+                primary={t('Settings')}
+                primaryTypographyProps={{ fontSize: '0.95rem', fontWeight: 500, color: '#64748B' }}
+              />
+            </ListItemButton>
+          )}
           <ListItemButton
-            sx={{ pl: 3, py: 1.2 }}
+            sx={{
+              pl: 3,
+              py: 1.2,
+              '&:hover svg': {
+                transform: 'rotate(360deg)',
+              }
+            }}
             onClick={() => {
               handleCloseMobileDrawer();
               logout();
             }}
           >
-            <ListItemIcon sx={{ minWidth: 40, color: '#64748B' }}>
+            <ListItemIcon sx={{
+              minWidth: 40,
+              color: '#64748B',
+              '& svg': {
+                transition: 'transform 0.5s ease-in-out'
+              }
+            }}>
               <LogoutIcon />
             </ListItemIcon>
             <ListItemText

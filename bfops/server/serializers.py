@@ -43,8 +43,8 @@ class TransferHistorySerializer(serializers.ModelSerializer):
         return "-"
 
 class JobSerializer(serializers.ModelSerializer):
-    # Added a custom field to return the names and IDs of all accepted grades
     accepted_grades_info = serializers.SerializerMethodField()
+    company_name = serializers.CharField(source="company.name", read_only=True)
 
     class Meta:
         model = Job
@@ -53,14 +53,30 @@ class JobSerializer(serializers.ModelSerializer):
             "name",
             "code",
             "company",
-            "grades", # Use this to send a list of grade IDs when creating/updating
-            "accepted_grades_info", # Read-only friendly output for the frontend
+            "company_name",
+            "grades", 
+            "accepted_grades_info", 
             "max_workers",
             "created_at",
         ]
 
     def get_accepted_grades_info(self, obj):
         return [{"id": g.id, "name": g.name} for g in obj.grades.all()]
+
+    def validate(self, attrs):
+        name = attrs.get("name", getattr(self.instance, "name", None))
+        company = attrs.get("company", getattr(self.instance, "company", None))
+
+        if name and company:
+            duplicate_qs = Job.objects.filter(company=company, name=name)
+            if self.instance:
+                duplicate_qs = duplicate_qs.exclude(id=self.instance.id)
+            if duplicate_qs.exists():
+                raise serializers.ValidationError({
+                    "name": "This job name already exists in the selected company."
+                })
+
+        return attrs
 
 class GradeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -149,6 +165,7 @@ class PersonSerializer(serializers.ModelSerializer):
 class AssignmentSerializer(serializers.ModelSerializer):
     person_name = serializers.CharField(source="person.__str__", read_only=True)
     job_name = serializers.CharField(source="job.name", read_only=True)
+    company_id = serializers.IntegerField(source="job.company.id", read_only=True)
     company_name = serializers.CharField(source="job.company.name", read_only=True)
     unite_id = serializers.IntegerField(source="job.company.unite.id", read_only=True)
     unite_name = serializers.CharField(
@@ -167,6 +184,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
             "year",
             "person_name",
             "job_name",
+            "company_id",
             "company_name",
             "unite_id",
             "unite_name",

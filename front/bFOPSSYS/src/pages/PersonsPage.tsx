@@ -1,4 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { 
+  Dialog, DialogTitle, DialogContent, DialogActions, Button, 
+  Table, TableHead, TableRow, TableCell, TableBody, Typography, Box, IconButton, Tooltip 
+} from '@mui/material';
 import * as XLSX from 'xlsx';
 import { bulkCreatePersons } from '../api-persons';
 import axios from 'axios';
@@ -8,6 +12,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import DescriptionIcon from '@mui/icons-material/Description';
+import InfoIcon from '@mui/icons-material/Info';
 import { useI18n } from '../i18n/translator';
 import '../styles/persons.css';
 
@@ -42,14 +47,17 @@ const PersonsPage = () => {
   const [grades, setGrades] = useState<any[]>([]);
   const [unites, setUnites] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<any[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [bulkUploading, setBulkUploading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     axios.get('/api/grades/').then(res => setGrades(res.data.results || res.data));
     axios.get('/api/unites/').then(res => setUnites(res.data.results || res.data));
     axios.get('/api/companies/').then(res => setCompanies(res.data.results || res.data));
+    axios.get('/api/jobs/').then(res => setJobs(res.data.results || res.data));
   }, []);
 
   const fetchPersons = async () => {
@@ -71,16 +79,47 @@ const PersonsPage = () => {
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const json: any[] = XLSX.utils.sheet_to_json(sheet);
       
-      const records = json.map(row => ({
-        first_name: row.first_name || row.FirstName || '',
-        last_name: row.last_name || row.LastName || '',
-        national_id: row.national_id || row.NationalID || '',
-        contract_type: row.contract_type || 'actif',
-        grade: row.grade || null,
-        unite: row.unite || null,
-        company: row.company || null,
-        job: row.job || null,
-      }));
+      const records: any[] = [];
+      const errors: string[] = [];
+
+      json.forEach((row, index) => {
+        const rowNum = index + 2;
+
+        const findId = (list: any[], val: any, nameField = 'name') => {
+          if (val == null || val === '') return null;
+          const found = list.find(item => 
+            String(item[nameField]).trim().toLowerCase() === String(val).trim().toLowerCase() || 
+            String(item.id) === String(val)
+          );
+          return found ? found.id : undefined;
+        };
+
+        const gradeId = findId(grades, row.grade || row.Grade);
+        const uniteId = findId(unites, row.unite || row.Unite);
+        const companyId = findId(companies, row.company || row.Company);
+        const jobId = findId(jobs, row.job || row.Job);
+
+        if (gradeId === undefined) errors.push(`Row ${rowNum}: Grade "${row.grade}" not found.`);
+        if (uniteId === undefined) errors.push(`Row ${rowNum}: Unite "${row.unite}" not found.`);
+        if (companyId === undefined) errors.push(`Row ${rowNum}: Company "${row.company}" not found.`);
+        if (jobId === undefined) errors.push(`Row ${rowNum}: Job "${row.job}" not found.`);
+
+        records.push({
+          first_name: row.first_name || row.FirstName || '',
+          last_name: row.last_name || row.LastName || '',
+          national_id: row.national_id || row.NationalID || '',
+          contract_type: row.contract_type || row.ContractType || 'actif',
+          grade: gradeId || null,
+          unite: uniteId || null,
+          company: companyId || null,
+          job: jobId || null,
+        });
+      });
+
+      if (errors.length > 0) {
+        alert(t('Upload aborted. Please fix the following errors in your Excel file:\n\n') + errors.join('\n'));
+        return;
+      }
       
       await bulkCreatePersons(records);
       alert(t('Bulk upload successful!'));
@@ -166,6 +205,11 @@ const PersonsPage = () => {
             onChange={handleExcelUpload} 
             style={{ display: 'none' }} 
           />
+          <Tooltip title={t('View Expected Excel Format')}>
+            <button className="btn btn-outline" onClick={() => setPreviewOpen(true)} style={{ padding: '8px 12px' }}>
+              <InfoIcon fontSize="small" />
+            </button>
+          </Tooltip>
           <button className="btn btn-outline" onClick={() => fileInputRef.current?.click()} disabled={bulkUploading}>
             <UploadFileIcon fontSize="small" />
             {bulkUploading ? t('Uploading...') : t('Bulk Upload')}
@@ -330,6 +374,56 @@ const PersonsPage = () => {
           </div>
         </div>
       </div>
+
+      <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>{t('Expected Excel Format for Persons')}</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" gutterBottom>
+            {t('Ensure your Excel file has a heading row matching these exact column names. Additional columns will be ignored.')}
+          </Typography>
+          <div style={{ overflowX: 'auto' }}>
+            <Table size="small" sx={{ minWidth: 600, border: '1px solid #ddd', mt: 2 }}>
+              <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableRow>
+                  <TableCell><strong>first_name</strong></TableCell>
+                  <TableCell><strong>last_name</strong></TableCell>
+                  <TableCell><strong>national_id</strong></TableCell>
+                  <TableCell><strong>contract_type</strong></TableCell>
+                  <TableCell><strong>grade</strong></TableCell>
+                  <TableCell><strong>unite</strong></TableCell>
+                  <TableCell><strong>company</strong></TableCell>
+                  <TableCell><strong>job</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                <TableRow>
+                  <TableCell>John</TableCell>
+                  <TableCell>Doe</TableCell>
+                  <TableCell>N12345</TableCell>
+                  <TableCell>actif</TableCell>
+                  <TableCell>capitaine</TableCell>
+                  <TableCell>Bataillon</TableCell>
+                  <TableCell>Compagnie 1</TableCell>
+                  <TableCell>Agent Polyvalent</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Jane</TableCell>
+                  <TableCell>Smith</TableCell>
+                  <TableCell>N67890</TableCell>
+                  <TableCell>contractuel</TableCell>
+                  <TableCell>commandant</TableCell>
+                  <TableCell>Regiment</TableCell>
+                  <TableCell>Compagnie HQ</TableCell>
+                  <TableCell>Chef OPS</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPreviewOpen(false)}>{t('Close')}</Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };

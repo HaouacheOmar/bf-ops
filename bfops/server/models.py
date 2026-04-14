@@ -42,7 +42,7 @@ class Company(models.Model):
 
 
 class Job(models.Model):
-    name = models.CharField(max_length=200, unique=True)
+    name = models.CharField(max_length=200)
     code = models.CharField(max_length=50, unique=True)
     company = models.ForeignKey(
         Company,
@@ -59,6 +59,12 @@ class Job(models.Model):
 
     class Meta:
         ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company", "name"],
+                name="unique_job_name_per_company",
+            ),
+        ]
 
     def __str__(self):
         return self.name
@@ -93,7 +99,7 @@ class UniteQuota(models.Model):
 class Person(models.Model):
     first_name = models.CharField(max_length=150)
     last_name = models.CharField(max_length=150)
-    national_id = models.CharField(max_length=50, unique=True) # Assuming this acts as 'matricule'
+    national_id = models.CharField(max_length=50, unique=True)
     grade = models.ForeignKey(
         Grade,
         on_delete=models.SET_NULL,
