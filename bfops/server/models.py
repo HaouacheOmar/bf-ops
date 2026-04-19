@@ -27,7 +27,7 @@ class Company(models.Model):
     code = models.CharField(max_length=50, unique=True)
     unite = models.ForeignKey(
         Unite,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,  # CASCADE to delete companies and jobs when Unite is deleted
         null=True,
         blank=True,
         related_name="companies"
@@ -40,21 +40,18 @@ class Company(models.Model):
     def __str__(self):
         return self.name
 
-
 class Job(models.Model):
     name = models.CharField(max_length=200, unique=True)
     code = models.CharField(max_length=50, unique=True)
     company = models.ForeignKey(
         Company,
-        on_delete=models.CASCADE,
+        on_delete=models.CASCADE,  # CASCADE so jobs delete when Company deletes
+        null=True,
+        blank=True,
         related_name="jobs"
     )
-    grades = models.ManyToManyField(
-            Grade,
-            blank=True,
-            related_name="jobs"
-        )
-    max_workers = models.PositiveIntegerField()
+    grade = models.ForeignKey(Grade, on_delete=models.SET_NULL, null=True, blank=True)
+    max_workers = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -63,11 +60,8 @@ class Job(models.Model):
     def __str__(self):
         return self.name
 
-
 class Year(models.Model):
-    year = models.PositiveIntegerField(unique=True)
-    total_quota = models.PositiveIntegerField()
-    is_closed = models.BooleanField(default=False)
+    year = models.IntegerField(unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -76,117 +70,60 @@ class Year(models.Model):
     def __str__(self):
         return str(self.year)
 
-
 class UniteQuota(models.Model):
-    year = models.ForeignKey(Year, on_delete=models.CASCADE, related_name="unite_quotas")
-    unite = models.ForeignKey(Unite, on_delete=models.CASCADE, related_name="unite_quotas")
+    year = models.ForeignKey(Year, on_delete=models.CASCADE, related_name="quotas")
+    unite = models.ForeignKey(Unite, on_delete=models.CASCADE, related_name="quotas")
     quota = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ("year", "unite")
-        ordering = ["year", "unite"]
+        ordering = ["-year", "unite__name"]
 
     def __str__(self):
-        return f"{self.year.year} - {self.unite.name}: {self.quota}"
-
+        return f"{self.unite.name} - {self.year.year}: {self.quota}"
 
 class Person(models.Model):
-    first_name = models.CharField(max_length=150)
-    last_name = models.CharField(max_length=150)
-    national_id = models.CharField(max_length=50, unique=True) # Assuming this acts as 'matricule'
-    grade = models.ForeignKey(
-        Grade,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="persons"
-    )
-    unite = models.ForeignKey(
-        Unite,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="persons"
-    )
-    company = models.ForeignKey(
-        Company,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="persons"
-    )
-    job = models.ForeignKey(
-        Job,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="persons"
-    )
-    contract_type = models.CharField(
-        max_length=20,
-        choices=(
-            ("actif", "Actif"),
-            ("contractuel", "Contractuel"),
-        ),
-        default="actif"
-    )
+    CONTRACT_CHOICES = [
+        ('actif', 'Actif'),
+        ('contractuel', 'Contractuel'),
+    ]
+
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    national_id = models.CharField(max_length=50, unique=True)
+    contract_type = models.CharField(max_length=20, choices=CONTRACT_CHOICES, default='actif')
+    grade = models.ForeignKey(Grade, on_delete=models.SET_NULL, null=True, blank=True, related_name="persons")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["last_name", "first_name"]
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name}"
+        return f"{self.first_name} {self.last_name} ({self.national_id})"
 
 class Assignment(models.Model):
-    person = models.ForeignKey(
-        Person,
-        on_delete=models.CASCADE,
-        related_name="assignments"
-    )
-    job = models.ForeignKey(
-        Job,
-        on_delete=models.CASCADE,
-        related_name="assignments"
-    )
-    year = models.ForeignKey(
-        Year,
-        on_delete=models.CASCADE,
-        related_name="assignments"
-    )
+    person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="assignments")
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name="assignments")
+    year = models.ForeignKey(Year, on_delete=models.CASCADE, related_name="assignments")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ("person", "year")
-        indexes = [
-            models.Index(fields=["job", "year"]),
-        ]
+        ordering = ["-year", "job"]
 
     def __str__(self):
-        return f"{self.person} - {self.job} - {self.year}"
-
+        return f"{self.person} -> {self.job} ({self.year})"
 
 class TransferHistory(models.Model):
-    assignment = models.ForeignKey(
-        Assignment,
-        on_delete=models.CASCADE,
-        related_name="transfers"
-    )
-
-    from_unite = models.ForeignKey(
-        'Unite',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='transfers_from'
-    )
-    to_unite = models.ForeignKey(
-        'Unite',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='transfers_to'
-    )
+    assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name="transfers")
+    
+    from_unite = models.ForeignKey(Unite, on_delete=models.SET_NULL, null=True, blank=True, related_name="transfers_out")
+    to_unite = models.ForeignKey(Unite, on_delete=models.SET_NULL, null=True, blank=True, related_name="transfers_in")
+    
+    from_company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name="transfers_out")
+    to_company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name="transfers_in")
+    
     transfer_date = models.DateTimeField(auto_now_add=True)
     reason = models.TextField(blank=True, null=True)
 
@@ -195,7 +132,6 @@ class TransferHistory(models.Model):
 
     def __str__(self):
         return f"{self.assignment.person} moved"
-
 
 class Gain(models.Model):
     person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="gains")

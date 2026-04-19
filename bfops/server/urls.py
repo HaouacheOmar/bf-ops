@@ -19,8 +19,6 @@ urlpatterns = [
     # Automatically maps all ViewSet routes (CRUD + bulk actions)
     path('', include(router.urls)),
 
-    # Custom Actions & Statistics
-    path('transfers-execute/', views.execute_transfer, name='execute-transfer'),
     
     path('stats/jobs/', views.JobStatsView.as_view(), name='job-stats'),
     path('stats/unites/', views.UniteStatsView.as_view(), name='unite-stats'),

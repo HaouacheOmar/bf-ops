@@ -53,8 +53,9 @@ class UniteQuotaViewSet(viewsets.ModelViewSet):
     queryset = UniteQuota.objects.select_related("year", "unite").all()
     serializer_class = UniteQuotaSerializer
 
+
 class TransferHistoryViewSet(viewsets.ModelViewSet):
-    queryset = TransferHistory.objects.select_related("assignment", "from_unite", "to_unite").all()
+    queryset = TransferHistory.objects.select_related("assignment", "from_unite", "to_unite", "from_company", "to_company").all()
     serializer_class = TransferHistorySerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = {
@@ -63,6 +64,63 @@ class TransferHistoryViewSet(viewsets.ModelViewSet):
     }
     search_fields = ['reason']
     ordering_fields = ['transfer_date', 'from_unite', 'to_unite']
+
+    @action(detail=False, methods=['post'], url_path='execute')
+    @transaction.atomic
+    def execute_transfer(self, request):
+        assignment_id = request.data.get('assignment_id')
+        new_unite_id = request.data.get('new_unite_id')
+        new_company_id = request.data.get('new_company_id')
+        reason = request.data.get('reason', 'Transfert')
+
+        if not all([assignment_id, new_unite_id, new_company_id]):
+            return Response({"error": "Veuillez fournir l'affectation, l'unité et la compagnie de destination."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            assignment = Assignment.objects.select_related('job__company__unite').get(id=assignment_id)
+            new_unite = Unite.objects.get(id=new_unite_id)
+            new_company = Company.objects.get(id=new_company_id, unite=new_unite) 
+        except Assignment.DoesNotExist:
+            return Response({"error": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Unite.DoesNotExist:
+            return Response({"error": "Destination Unite not found."}, status=status.HTTP_404_NOT_FOUND)
+        except Company.DoesNotExist:
+            return Response({"error": "La compagnie sélectionnée n'existe pas ou n'appartient pas à l'unité choisie."}, status=status.HTTP_400_BAD_REQUEST)
+
+        old_job = assignment.job
+        old_company = old_job.company
+        old_unite = old_company.unite
+
+        # Check only if old_company == new_company to allow internal same-unit transfers
+        if old_company == new_company:
+            return Response({"error": "Le travailleur est déjà dans cette compagnie."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create the pending job inside the selected company
+        pending_job, _ = Job.objects.get_or_create(
+            company=new_company, 
+            name="En attente d'affectation", 
+            defaults={"code": f"ATT-{new_company.code}", "max_workers": 999}
+        )
+
+        Loss.objects.create(person=assignment.person, year=assignment.year, unite=old_unite, company=old_company)
+        Gain.objects.create(person=assignment.person, year=assignment.year, unite=new_unite, company=new_company)
+
+        # Create the TransferHistory record
+        TransferHistory.objects.create(
+            assignment=assignment, 
+            from_unite=old_unite, 
+            to_unite=new_unite, 
+            from_company=old_company, 
+            to_company=new_company, 
+            reason=reason
+        )
+
+        # Update the Assignment 
+        assignment.job = pending_job
+        assignment.save()
+
+        return Response({"message": f"Transfert réussi vers la compagnie {new_company.name}."}, status=status.HTTP_200_OK)
+
 
 class AssignmentViewSet(viewsets.ModelViewSet):
     queryset = Assignment.objects.select_related("person", "job", "year").all()
@@ -97,7 +155,6 @@ class UniteViewSet(viewsets.ModelViewSet):
     ordering_fields = ['name', 'created_at']
 
     def list(self, request, *args, **kwargs):
-        # FIX: Use urlencode with sorted parameters for a stable cache key
         query_string = urlencode(sorted(request.query_params.items()))
         key = f"unites:{query_string}"
         
@@ -155,7 +212,6 @@ class PersonViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# Gain/Loss views only need Read-Only access 
 class GainViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Gain.objects.select_related("person", "unite", "company", "year").all()
     serializer_class = GainSerializer
@@ -167,42 +223,3 @@ class LossViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = LossSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['unite', 'company', 'year']
-
-# --- Custom Actions ---
-@api_view(['POST'])
-@transaction.atomic
-def execute_transfer(request):
-    assignment_id = request.data.get('assignment_id')
-    new_unite_id = request.data.get('new_unite_id')
-    reason = request.data.get('reason', 'Transfert Unité')
-
-    try:
-        assignment = Assignment.objects.select_related('job__company__unite').get(id=assignment_id)
-        new_unite = Unite.objects.get(id=new_unite_id)
-    except (Assignment.DoesNotExist, Unite.DoesNotExist):
-        return Response({"error": "Assignment or Destination Unite not found."}, status=status.HTTP_404_NOT_FOUND)
-
-    old_job = assignment.job
-    old_company = old_job.company
-    old_unite = old_company.unite
-
-    if old_unite == new_unite:
-        return Response({"error": "Le travailleur est déjà dans cette unité."}, status=status.HTTP_400_BAD_REQUEST)
-
-    pool_company, _ = Company.objects.get_or_create(
-        unite=new_unite, name=f"Pool - {new_unite.name}", defaults={"code": f"POOL-{new_unite.code}"}
-    )
-    
-    pending_job, _ = Job.objects.get_or_create(
-        company=pool_company, name="En attente d'affectation", defaults={"code": f"ATT-{new_unite.code}", "max_workers": 999}
-    )
-
-    Loss.objects.create(person=assignment.person, year=assignment.year, unite=old_unite, company=old_company)
-    Gain.objects.create(person=assignment.person, year=assignment.year, unite=new_unite, company=pool_company)
-    
-    TransferHistory.objects.create(assignment=assignment, from_unite=old_unite, to_unite=new_unite, reason=reason)
-
-    assignment.job = pending_job
-    assignment.save()
-
-    return Response({"message": f"Transfert réussi vers l'unité {new_unite.name}."}, status=status.HTTP_200_OK)
