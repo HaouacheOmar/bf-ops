@@ -1,4 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { 
+  Dialog, DialogTitle, DialogContent, DialogActions, Button, 
+  Table, TableHead, TableRow, TableCell, TableBody, Typography, Box, IconButton, Tooltip 
+} from '@mui/material';
 import * as XLSX from 'xlsx';
 import { bulkCreatePersons } from '../api-persons';
 import axios from 'axios';
@@ -8,7 +12,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import DescriptionIcon from '@mui/icons-material/Description';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import InfoIcon from '@mui/icons-material/Info';
+import { useI18n } from '../i18n/translator';
 import '../styles/persons.css';
 
 interface Person {
@@ -28,13 +33,14 @@ interface Person {
 }
 
 const PersonsPage = () => {
+  const { t } = useI18n();
   const [persons, setPersons] = useState<Person[]>([]);
   const [filter, setFilter] = useState('');
   const [editing, setEditing] = useState<Person | null>(null);
   
   const initialFormState = { 
     first_name: '', last_name: '', national_id: '', 
-    contract_type: 'actif', grade: '', unite: '', company: '', job: ''
+    contract_type: 'actif', grade: '', unite: '', company: ''
   };
   const [form, setForm] = useState(initialFormState);
   
@@ -45,6 +51,7 @@ const PersonsPage = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [bulkUploading, setBulkUploading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     axios.get('/api/grades/').then(res => setGrades(res.data.results || res.data));
@@ -72,22 +79,53 @@ const PersonsPage = () => {
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const json: any[] = XLSX.utils.sheet_to_json(sheet);
       
-      const records = json.map(row => ({
-        first_name: row.first_name || row.FirstName || '',
-        last_name: row.last_name || row.LastName || '',
-        national_id: row.national_id || row.NationalID || '',
-        contract_type: row.contract_type || 'actif',
-        grade: row.grade || null,
-        unite: row.unite || null,
-        company: row.company || null,
-        job: row.job || null,
-      }));
+      const records: any[] = [];
+      const errors: string[] = [];
+
+      json.forEach((row, index) => {
+        const rowNum = index + 2;
+
+        const findId = (list: any[], val: any, nameField = 'name') => {
+          if (val == null || val === '') return null;
+          const found = list.find(item => 
+            String(item[nameField]).trim().toLowerCase() === String(val).trim().toLowerCase() || 
+            String(item.id) === String(val)
+          );
+          return found ? found.id : undefined;
+        };
+
+        const gradeId = findId(grades, row.grade || row.Grade);
+        const uniteId = findId(unites, row.unite || row.Unite);
+        const companyId = findId(companies, row.company || row.Company);
+        const jobId = findId(jobs, row.job || row.Job);
+
+        if (gradeId === undefined) errors.push(`Row ${rowNum}: Grade "${row.grade}" not found.`);
+        if (uniteId === undefined) errors.push(`Row ${rowNum}: Unite "${row.unite}" not found.`);
+        if (companyId === undefined) errors.push(`Row ${rowNum}: Company "${row.company}" not found.`);
+        if (jobId === undefined) errors.push(`Row ${rowNum}: Job "${row.job}" not found.`);
+
+        records.push({
+          first_name: row.first_name || row.FirstName || '',
+          last_name: row.last_name || row.LastName || '',
+          national_id: row.national_id || row.NationalID || '',
+          contract_type: row.contract_type || row.ContractType || 'actif',
+          grade: gradeId || null,
+          unite: uniteId || null,
+          company: companyId || null,
+          job: jobId || null,
+        });
+      });
+
+      if (errors.length > 0) {
+        alert(t('Upload aborted. Please fix the following errors in your Excel file:\n\n') + errors.join('\n'));
+        return;
+      }
       
       await bulkCreatePersons(records);
-      alert('Bulk upload successful!');
+      alert(t('Bulk upload successful!'));
       fetchPersons();
     } catch (err: any) {
-      alert('Bulk upload failed: ' + (err?.message || 'Unknown error'));
+      alert(t('Bulk upload failed:') + ' ' + (err?.message || t('Unknown error')));
     } finally {
       setBulkUploading(false);
       e.target.value = '';
@@ -101,7 +139,6 @@ const PersonsPage = () => {
       grade: form.grade === '' ? null : form.grade,
       unite: form.unite === '' ? null : form.unite,
       company: form.company === '' ? null : form.company,
-      job: form.job === '' ? null : form.job,
     };
 
     if (editing) {
@@ -125,7 +162,6 @@ const PersonsPage = () => {
       grade: person.grade ? String(person.grade) : '',
       unite: person.unite ? String(person.unite) : '',
       company: person.company ? String(person.company) : '',
-      job: person.job ? String(person.job) : '',
     });
   };
 
@@ -137,18 +173,29 @@ const PersonsPage = () => {
   };
 
   const filteredCompanies = form.unite ? companies.filter(c => String(c.unite) === String(form.unite)) : companies;
-  const filteredJobs = form.company ? jobs.filter(j => String(j.company) === String(form.company)) : jobs;
 
   const getInitials = (first: string, last: string) => {
     return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
+  };
+
+  const getContractTypeLabel = (value: string) => {
+    if (value === 'actif') return t('Active');
+    if (value === 'contractuel') return t('Contractual');
+    return t(value || '-');
+  };
+
+  const getWorkModeLabel = (value: string) => {
+    if (value === 'actif') return t('Full-Time');
+    if (value === 'contractuel') return t('Freelance');
+    return t('-');
   };
 
   return (
     <div className="persons-page-container">
       <header className="page-header">
         <div className="page-title">
-          <h1>Talent Management</h1>
-          <p>Review and manage individual records for the company.</p>
+          <h1>{t('Talent Management')}</h1>
+          <p>{t('Review and manage individual records for the company.')}</p>
         </div>
         <div className="header-actions">
           <input 
@@ -158,13 +205,18 @@ const PersonsPage = () => {
             onChange={handleExcelUpload} 
             style={{ display: 'none' }} 
           />
+          <Tooltip title={t('View Expected Excel Format')}>
+            <button className="btn btn-outline" onClick={() => setPreviewOpen(true)} style={{ padding: '8px 12px' }}>
+              <InfoIcon fontSize="small" />
+            </button>
+          </Tooltip>
           <button className="btn btn-outline" onClick={() => fileInputRef.current?.click()} disabled={bulkUploading}>
             <UploadFileIcon fontSize="small" />
-            {bulkUploading ? 'Uploading...' : 'Bulk Upload'}
+            {bulkUploading ? t('Uploading...') : t('Bulk Upload')}
           </button>
           <button className="btn btn-primary" onClick={() => { setEditing(null); setForm(initialFormState); }}>
             <PersonAddIcon fontSize="small" />
-            Add New Person
+            {t('Add New Person')}
           </button>
         </div>
       </header>
@@ -174,36 +226,36 @@ const PersonsPage = () => {
           <div className="card">
             <div className="card-header-flex">
               <div className="card-icon"><DescriptionIcon fontSize="small" /></div>
-              <h2 className="card-title">{editing ? 'Edit Record' : 'New Record'}</h2>
+              <h2 className="card-title">{editing ? t('Edit Record') : t('New Record')}</h2>
             </div>
 
             <form onSubmit={handleSubmit}>
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">First Name</label>
+                  <label className="form-label">{t('First Name')}</label>
                   <input type="text" className="form-input" placeholder="Jane" value={form.first_name} onChange={e => setForm(f => ({ ...f, first_name: e.target.value }))} required />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Last Name</label>
+                  <label className="form-label">{t('Last Name')}</label>
                   <input type="text" className="form-input" placeholder="Doe" value={form.last_name} onChange={e => setForm(f => ({ ...f, last_name: e.target.value }))} required />
                 </div>
               </div>
 
               <div className="form-group">
-                <label className="form-label">National ID</label>
+                <label className="form-label">{t('National ID')}</label>
                 <input type="text" className="form-input" placeholder="ID-000-00-0000" value={form.national_id} onChange={e => setForm(f => ({ ...f, national_id: e.target.value }))} required />
               </div>
 
               <div className="form-group">
-                <label className="form-label">Type of Contract</label>
+                <label className="form-label">{t('Type of Contract')}</label>
                 <select className="form-select" value={form.contract_type} onChange={e => setForm(f => ({ ...f, contract_type: e.target.value as 'actif' | 'contractuel' }))} required>
-                  <option value="actif">Actif (Permanent)</option>
-                  <option value="contractuel">Contractuel (Temporary)</option>
+                  <option value="actif">{t('Active')} ({t('Permanent')})</option>
+                  <option value="contractuel">{t('Contractual')} ({t('Temporary')})</option>
                 </select>
               </div>
 
               <div className="form-group">
-                <label className="form-label">Grade</label>
+                <label className="form-label">{t('Grade')}</label>
                 <div className="grades-toggle-container">
                   {grades.map(g => (
                     <div 
@@ -215,63 +267,51 @@ const PersonsPage = () => {
                     </div>
                   ))}
                   <div className={`grade-btn ${form.grade === '' ? 'active' : ''}`} onClick={() => setForm(f => ({ ...f, grade: '' }))}>
-                    None
+                    {t('None')}
                   </div>
                 </div>
               </div>
 
               <div className="form-group" style={{ marginTop: '20px' }}>
-                <label className="form-label">Unite</label>
+                <label className="form-label">{t('Unite')}</label>
                 <select className="form-select" value={form.unite} onChange={e => setForm(f => ({ ...f, unite: e.target.value, company: '', job: '' }))}>
-                  <option value="">Select Unite...</option>
+                  <option value="">{t('Select Unite...')}</option>
                   {unites.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
               </div>
 
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Company</label>
-                  <select className="form-select" value={form.company} onChange={e => setForm(f => ({ ...f, company: e.target.value, job: '' }))} disabled={!form.unite && filteredCompanies.length === 0}>
-                    <option value="">Select...</option>
+                  <label className="form-label">{t('Company')}</label>
+                  <select className="form-select" value={form.company} onChange={e => setForm(f => ({ ...f, company: e.target.value }))} disabled={!form.unite && filteredCompanies.length === 0}>
+                    <option value="">{t('Select...')}</option>
                     {filteredCompanies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Job</label>
-                  <select className="form-select" value={form.job} onChange={e => setForm(f => ({ ...f, job: e.target.value }))} disabled={!form.company && filteredJobs.length === 0}>
-                    <option value="">Select...</option>
-                    {filteredJobs.map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
                   </select>
                 </div>
               </div>
 
               <button type="submit" className="btn btn-primary btn-full-width">
-                {editing ? 'Update Identity' : 'Create Identity'}
+                {editing ? t('Update Identity') : t('Create Identity')}
               </button>
               {editing && (
                  <button type="button" className="btn btn-outline btn-full-width" style={{ marginTop: '8px'}} onClick={() => { setEditing(null); setForm(initialFormState); }}>
-                   Cancel Edit
+                   {t('Cancel Edit')}
                  </button>
               )}
             </form>
-          </div>
-
-          <div className="mini-stats-card">
-            <h4 className="mini-stats-title">Total Employees Active</h4>
-            <p className="mini-stats-value">{persons.length}</p>
           </div>
         </div>
 
         <div className="right-column">
           <div className="card">
             <div className="table-header">
-              <h2 className="card-title">Personnel Registry</h2>
+              <h2 className="card-title">{t('Personnel Registry')}</h2>
               <div className="search-input-wrapper">
                 <SearchIcon className="search-icon" fontSize="small" />
                 <input 
                   type="text" 
                   className="search-input" 
-                  placeholder="Search employee record..." 
+                  placeholder={t('Search employee record...')} 
                   value={filter} 
                   onChange={e => setFilter(e.target.value)} 
                 />
@@ -281,11 +321,11 @@ const PersonsPage = () => {
             <table className="custom-table">
               <thead>
                 <tr>
-                  <th>Employee</th>
-                  <th>Contract</th>
-                  <th>Unit / Company</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th>{t('Employee')}</th>
+                  <th>{t('Contract')}</th>
+                  <th>{t('Unit / Company')}</th>
+                  <th>{t('Status')}</th>
+                  <th>{t('Actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -298,20 +338,20 @@ const PersonsPage = () => {
                         </div>
                         <div className="employee-info">
                           <h4>{person.first_name} {person.last_name}</h4>
-                          <p>{person.job_name || 'No Job Assigned'}</p>
+                          <p>{person.job_name || t('No Job Assigned')}</p>
                         </div>
                       </div>
                     </td>
-                    <td>{person.contract_type === 'actif' ? 'Full-Time' : 'Freelance'}</td>
+                    <td>{getWorkModeLabel(person.contract_type)}</td>
                     <td>
                       <div className="employee-info">
-                        <h4>{person.company_name || 'No Company'}</h4>
+                        <h4>{person.company_name || t('No Company')}</h4>
                         <p>{person.unite_name || '-'}</p>
                       </div>
                     </td>
                     <td>
                       <span className={`status-chip ${person.contract_type}`}>
-                        {person.contract_type}
+                        {getContractTypeLabel(person.contract_type)}
                       </span>
                     </td>
                     <td>
@@ -325,26 +365,65 @@ const PersonsPage = () => {
                 {persons.length === 0 && (
                   <tr>
                     <td colSpan={5} style={{ textAlign: 'center', padding: '32px', color: '#6b7280' }}>
-                      No employee records found.
+                      {t('No employee records found.')}
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
-
-          <div className="audit-banner">
-             <div className="audit-info">
-                <div className="audit-icon"><InfoOutlinedIcon /></div>
-                <div className="audit-text">
-                   <h4>Quarterly Audit Reminder</h4>
-                   <p>Please ensure all contract assignments are digitally reviewed by Friday.</p>
-                </div>
-             </div>
-             <button className="btn btn-white">Review Policy</button>
-          </div>
         </div>
       </div>
+
+      <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>{t('Expected Excel Format for Persons')}</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" gutterBottom>
+            {t('Ensure your Excel file has a heading row matching these exact column names. Additional columns will be ignored.')}
+          </Typography>
+          <div style={{ overflowX: 'auto' }}>
+            <Table size="small" sx={{ minWidth: 600, border: '1px solid #ddd', mt: 2 }}>
+              <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableRow>
+                  <TableCell><strong>first_name</strong></TableCell>
+                  <TableCell><strong>last_name</strong></TableCell>
+                  <TableCell><strong>national_id</strong></TableCell>
+                  <TableCell><strong>contract_type</strong></TableCell>
+                  <TableCell><strong>grade</strong></TableCell>
+                  <TableCell><strong>unite</strong></TableCell>
+                  <TableCell><strong>company</strong></TableCell>
+                  <TableCell><strong>job</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                <TableRow>
+                  <TableCell>John</TableCell>
+                  <TableCell>Doe</TableCell>
+                  <TableCell>N12345</TableCell>
+                  <TableCell>actif</TableCell>
+                  <TableCell>capitaine</TableCell>
+                  <TableCell>Bataillon</TableCell>
+                  <TableCell>Compagnie 1</TableCell>
+                  <TableCell>Agent Polyvalent</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Jane</TableCell>
+                  <TableCell>Smith</TableCell>
+                  <TableCell>N67890</TableCell>
+                  <TableCell>contractuel</TableCell>
+                  <TableCell>commandant</TableCell>
+                  <TableCell>Regiment</TableCell>
+                  <TableCell>Compagnie HQ</TableCell>
+                  <TableCell>Chef OPS</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPreviewOpen(false)}>{t('Close')}</Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };

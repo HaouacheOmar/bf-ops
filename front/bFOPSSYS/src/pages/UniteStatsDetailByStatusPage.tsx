@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Typography, Paper, Container, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import { Typography, Paper, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip } from '@mui/material';
 import axios from 'axios';
+import { useI18n } from '../i18n/translator';
 
 interface UniteStat {
   unite_id: number;
@@ -21,6 +22,7 @@ interface UniteStat {
 }
 
 const UniteStatsDetailByStatusPage: React.FC = () => {
+  const { t } = useI18n();
   const { status, year } = useParams<{ status: string; year: string }>();
   const [uniteStats, setUniteStats] = useState<UniteStat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,14 +38,14 @@ const UniteStatsDetailByStatusPage: React.FC = () => {
       .finally(() => setLoading(false));
   }, [status, year]);
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div>{t('Loading...')}</div>;
 
   return (
-    <Container maxWidth="xl">
+    <Box sx={{ width: '100%', p: { xs: 2, md: 3 } }}>
       <Typography variant="h4" gutterBottom>
-        Unites with status: {status}
+        {t('Unites with status:')} {t(status || '')}
       </Typography>
-      {uniteStats.length === 0 && <Typography>No unites found for this status.</Typography>}
+      {uniteStats.length === 0 && <Typography>{t('No unites found for this status.')}</Typography>}
       {uniteStats.map(unite => (
         <Paper key={unite.unite_id} sx={{ p: 3, mt: 4, mb: 4 }}>
           <Typography variant="h5" gutterBottom>
@@ -53,33 +55,56 @@ const UniteStatsDetailByStatusPage: React.FC = () => {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Job</TableCell>
-                  <TableCell>Company</TableCell>
-                  <TableCell align="right">Current Workers</TableCell>
-                  <TableCell align="right">Max Workers</TableCell>
-                  <TableCell align="right">Missing</TableCell>
-                  <TableCell align="right">Percentage</TableCell>
-                  <TableCell align="right">Status</TableCell>
+                  <TableCell>{t('Job')}</TableCell>
+                  <TableCell>{t('Company')}</TableCell>
+                  <TableCell align="right">{t('Current Workers')}</TableCell>
+                  <TableCell align="right">{t('Max Workers')}</TableCell>
+                  <TableCell align="right">{t('Missing')}</TableCell>
+                  <TableCell align="right">{t('Percentage')}</TableCell>
+                  <TableCell align="right">{t('Unite Percentage')}</TableCell>
+                  <TableCell align="right">{t('Status')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {unite.jobs.map((job) => (
-                  <TableRow key={job.job_id}>
-                    <TableCell>{job.job_name}</TableCell>
-                    <TableCell>{job.company_name}</TableCell>
-                    <TableCell align="right">{job.current_workers}</TableCell>
-                    <TableCell align="right">{job.max_workers}</TableCell>
-                    <TableCell align="right">{job.difference < 0 ? -job.difference : 0}</TableCell>
-                    <TableCell align="right">{job.percentage.toFixed(1)}%</TableCell>
-                    <TableCell align="right">{job.status}</TableCell>
-                  </TableRow>
-                ))}
+                {(unite.jobs || []).map((job) => {
+                  const sameJobsInUnite = (unite.jobs || []).filter(j => j.job_name === job.job_name);
+                  const totalCurrent = sameJobsInUnite.reduce((acc, j) => acc + j.current_workers, 0);
+                  const totalMax = sameJobsInUnite.reduce((acc, j) => acc + j.max_workers, 0);
+                  const uniteDiff = totalCurrent - totalMax;
+                  const unitePercentage = totalMax > 0 ? (uniteDiff / totalMax) * 100 : 0;
+                  return (
+                    <TableRow 
+                      key={job.job_id}
+                      sx={{ 
+                        ...(job.status === 'deficit' && { bgcolor: '#ffebee' }),
+                        ...(job.status === 'surplus' && { bgcolor: '#fff8e1' }),
+                        ...(job.status === 'balanced' && { bgcolor: '#e8f5e9' }),
+                      }}
+                    >
+                      <TableCell>{job.job_name}</TableCell>
+                      <TableCell>{job.company_name}</TableCell>
+                      <TableCell align="right">{job.current_workers}</TableCell>
+                      <TableCell align="right">{job.max_workers}</TableCell>
+                      <TableCell align="right">{job.difference < 0 ? -job.difference : 0}</TableCell>
+                      <TableCell align="right">{job.percentage.toFixed(1)}%</TableCell>
+                      <TableCell align="right">{unitePercentage.toFixed(1)}%</TableCell>
+                      <TableCell align="right" sx={{ 
+                        fontWeight: 'bold',
+                        ...(job.status === 'deficit' && { color: '#c62828' }),
+                        ...(job.status === 'surplus' && { color: '#f57f17' }),
+                        ...(job.status === 'balanced' && { color: '#2e7d32' }),
+                      }}>
+                        {t(job.status)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>
         </Paper>
       ))}
-    </Container>
+    </Box>
   );
 };
 

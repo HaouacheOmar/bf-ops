@@ -2,11 +2,14 @@
 
 /* Page Layout */
 .persons-page-container {
-  padding: 24px 32px;
+  width: 100%;
+  padding: clamp(12px, 2vw, 24px) clamp(12px, 2.5vw, 32px);
   background-color: #f7f8fa; /* Light gray background */
-  min-height: 100vh;
+  min-height: calc(100vh - 64px);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color: #1a1b1f;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .page-header {
@@ -78,7 +81,7 @@
 /* Main Grid Layout */
 .content-grid {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
@@ -372,4 +375,52 @@
 .btn-white {
   background-color: white;
   color: #3b50df;
+}
+
+@media (max-width: 1024px) {
+  .persons-page-container {
+    padding: 20px;
+  }
+
+  .persons-page-container .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .persons-page-container {
+    padding: 12px;
+  }
+
+  .persons-page-container .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .persons-page-container .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .persons-page-container .header-actions .btn {
+    flex: 1 1 160px;
+  }
+
+  .persons-page-container .table-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .persons-page-container .search-input-wrapper {
+    width: 100%;
+  }
+
+  .persons-page-container .custom-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
 }

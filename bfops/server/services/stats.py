@@ -2,10 +2,8 @@ from django.db.models import Count
 from ..models import Assignment, Job
 
 def job_statistics(year_id):
-    """
-    Returns a list of job stats for the given year, including deficit/surplus/balanced status.
-    """
-    jobs = Job.objects.select_related("company__unite").all()
+
+    jobs = Job.objects.select_related("company__unite").exclude(name__iexact="En attente d'affectation")
     job_counts = dict(
         Assignment.objects
         .filter(year_id=year_id)
@@ -22,6 +20,7 @@ def job_statistics(year_id):
             "job_id": job.id,
             "job_name": job.name,
             "company_id": job.company.id if job.company else None,
+            "company_name": job.company.name if job.company else None,
             "unite_id": job.company.unite_id if job.company else None,
             "unite_name": job.company.unite.name if job.company and job.company.unite else None,
             "current_workers": current,
@@ -40,7 +39,13 @@ def unite_statistics(year_id):
     """
     Returns a list of unite stats for the given year, aggregating jobs in each unite.
     """
-    jobs = Job.objects.select_related("company__unite").all()
+    jobs = Job.objects.select_related("company__unite").exclude(name__iexact="En attente d'affectation")
+    job_counts = dict(
+        Assignment.objects
+        .filter(year_id=year_id)
+        .values_list("job_id")
+        .annotate(count=Count("id"))
+    )
     unite_map = {}
     for job in jobs:
         unite_id = job.company.unite_id if job.company and job.company.unite_id else None
@@ -50,19 +55,28 @@ def unite_statistics(year_id):
                 "unite_name": job.company.unite.name if job.company and job.company.unite else None,
                 "max_workers": 0,
                 "current_workers": 0,
+                "jobs": [],
             }
         unite_map[unite_id]["max_workers"] += job.max_workers
-
-    job_counts = dict(
-        Assignment.objects
-        .filter(year_id=year_id)
-        .values_list("job_id")
-        .annotate(count=Count("id"))
-    )
-    for job in jobs:
-        unite_id = job.company.unite_id if job.company and job.company.unite_id else None
-        if unite_id in unite_map:
-            unite_map[unite_id]["current_workers"] += job_counts.get(job.id, 0)
+        current_workers = job_counts.get(job.id, 0)
+        unite_map[unite_id]["current_workers"] += current_workers
+        difference = current_workers - job.max_workers
+        percentage = (difference / job.max_workers * 100) if job.max_workers > 0 else 0
+        unite_map[unite_id]["jobs"].append({
+            "job_id": job.id,
+            "job_name": job.name,
+            "company_id": job.company.id if job.company else None,
+            "company_name": job.company.name if job.company else None,
+            "current_workers": current_workers,
+            "max_workers": job.max_workers,
+            "difference": difference,
+            "percentage": round(percentage, 2),
+            "status": (
+                "deficit" if difference < 0
+                else "surplus" if difference > 0
+                else "balanced"
+            ),
+        })
 
     results = []
     for unite_id, data in unite_map.items():
@@ -83,6 +97,7 @@ def unite_statistics(year_id):
             "difference": difference,
             "percentage": round(percentage, 2),
             "status": status,
+            "jobs": data["jobs"],
         })
     return results
 
@@ -90,7 +105,7 @@ def company_statistics(year_id):
     """
     Returns a list of company stats for the given year, aggregating jobs in each company.
     """
-    jobs = Job.objects.select_related("company__unite").all()
+    jobs = Job.objects.select_related("company__unite").exclude(name__iexact="En attente d'affectation")
     company_map = {}
     
     for job in jobs:

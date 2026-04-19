@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>دليل استخدام BFops HR - عربي</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 14mm;
+    }
+
+    :root {
+      --ink: #0f172a;
+      --muted: #475569;
+      --line: #e2e8f0;
+      --brand: #2f49d1;
+      --soft: #f8fafc;
+      --okbg: #ecfeff;
+      --okline: #5eead4;
+      --warnbg: #fff7ed;
+      --warnline: #fdba74;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #fff;
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      line-height: 1.7;
+      font-size: 13.5px;
+    }
+
+    .cover {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 22px;
+      background: linear-gradient(145deg, #eef2ff 0%, #ffffff 60%);
+      margin-bottom: 16px;
+    }
+
+    .chips { margin-bottom: 10px; }
+
+    .chip {
+      display: inline-block;
+      border: 1px solid #c7d2fe;
+      background: #eef2ff;
+      color: #3730a3;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      margin-left: 6px;
+    }
+
+    h1, h2, h3 {
+      margin: 0 0 10px;
+      line-height: 1.35;
+    }
+
+    h1 {
+      font-size: 30px;
+      letter-spacing: -0.3px;
+    }
+
+    h2 {
+      margin-top: 22px;
+      font-size: 22px;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 6px;
+    }
+
+    h3 {
+      margin-top: 14px;
+      font-size: 18px;
+      color: #1e40af;
+    }
+
+    p {
+      margin: 0 0 8px;
+      color: var(--muted);
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+      font-size: 12px;
+      color: #334155;
+    }
+
+    .toc {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--soft);
+      padding: 10px 14px;
+      margin-bottom: 14px;
+    }
+
+    .toc ol {
+      margin: 4px 0 0;
+      padding-right: 18px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      margin: 12px 0;
+      background: #fff;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    img {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      margin-top: 8px;
+      margin-bottom: 8px;
+    }
+
+    ul, ol {
+      margin: 8px 0 10px;
+      padding-right: 20px;
+    }
+
+    li {
+      margin: 4px 0;
+      color: #334155;
+    }
+
+    .step {
+      font-weight: 700;
+      color: #111827;
+    }
+
+    .box {
+      border-right: 4px solid #93c5fd;
+      background: #eff6ff;
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin: 8px 0;
+      color: #0c4a6e;
+    }
+
+    .ok {
+      border-right-color: var(--okline);
+      background: var(--okbg);
+      color: #115e59;
+    }
+
+    .warn {
+      border-right-color: var(--warnline);
+      background: var(--warnbg);
+      color: #9a3412;
+    }
+
+    .footer-note {
+      margin-top: 18px;
+      border-top: 1px dashed #cbd5e1;
+      padding-top: 8px;
+      font-size: 11.5px;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div class="chips">
+      <span class="chip">BFops HR</span>
+      <span class="chip">Arabic User Guide</span>
+    </div>
+    <h1>دليل تشغيل BFops HR</h1>
+    <p>دليل عملي باللغة العربية يشرح جميع الشاشات المرفوعة خطوة بخطوة، ويغطي العمل اليومي للمسؤول داخل النظام.</p>
+    <div class="meta">
+      <div><strong>الإصدار:</strong> دليل تشغيلي</div>
+      <div><strong>تاريخ التحديث:</strong> 12-04-2026</div>
+    </div>
+  </section>
+
+  <section class="toc">
+    <h3>الفهرس</h3>
+    <ol>
+      <li>الأدوار والصلاحيات</li>
+      <li>تسجيل الدخول</li>
+      <li>إدارة الحسابات</li>
+      <li>إعداد المؤسسة: السرايا، الوحدات، الرتب، الأعوام، الحصص</li>
+      <li>الوظائف</li>
+      <li>الأفراد</li>
+      <li>المصالح (Assignments)</li>
+      <li>نموذج إنشاء توزيع</li>
+      <li>التحويلات</li>
+      <li>الربح والخسارة</li>
+    </ol>
+  </section>
+
+  <h2>1) الأدوار والصلاحيات</h2>
+  <div class="card">
+    <p><strong>المسؤول (Admin):</strong> يدير كل وحدات النظام، ويملك صلاحية التعديل والإضافة والحذف وإدارة الحسابات.</p>
+    <p><strong>المشاهد (Viewer/Guest):</strong> صلاحياته للاطلاع فقط حسب ضبط النظام.</p>
+    <div class="box ok">منطق الصلاحيات في الكود يعتمد على الدورين admin و viewer، وتظهر viewer في الواجهة باسم Guest.</div>
+  </div>
+
+  <h2>2) شاشة تسجيل الدخول</h2>
+  <div class="card">
+    <h3>الصورة 1: تسجيل الدخول</h3>
+    <img src="assets/login.png" alt="تسجيل الدخول" />
+    <ol>
+      <li><span class="step">الخطوة 1:</span> أدخل اسم المستخدم.</li>
+      <li><span class="step">الخطوة 2:</span> أدخل كلمة المرور.</li>
+      <li><span class="step">الخطوة 3:</span> اضغط زر "دخول".</li>
+      <li><span class="step">الخطوة 4:</span> عند نسيان كلمة المرور استخدم خيار "نسيت كلمة المرور".</li>
+    </ol>
+    <div class="box warn">إعادة تعيين كلمة المرور الذاتية متاحة لحسابات المسؤول فقط.</div>
+  </div>
+
+  <h2>3) إدارة الحسابات</h2>
+  <div class="card">
+    <h3>الصورة 2: صفحة إدارة الحسابات</h3>
+    <img src="assets/screen-01-users-management.png" alt="إدارة الحسابات" />
+    <ul>
+      <li>إنشاء حساب جديد بإدخال: اسم المستخدم، كلمة المرور، الدور.</li>
+      <li>تحديث كلمة مرور حساب موجود.</li>
+      <li>حذف حساب مع مراعاة قيود النظام (لا حذف لآخر مسؤول).</li>
+    </ul>
+    <div class="box">هذه الصفحة مخصصة للمسؤول فقط، وهي المرجع لإدارة صلاحيات المستخدمين.</div>
+  </div>
+
+  <h2>4) إعداد المؤسسة</h2>
+
+  <div class="card">
+    <h3>الصورة 3: تبويب السرايا</h3>
+    <img src="assets/screen-02-organization-companies.png" alt="إعداد المؤسسة - السرايا" />
+    <ol>
+      <li>من تبويب "السرايا" اضغط "إضافة سرية".</li>
+      <li>أدخل الاسم والكود ثم احفظ.</li>
+      <li>استخدم الفلاتر للبحث عن سرية حسب الاسم أو الكود.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h3>الصورة 4: تبويب الوحدات</h3>
+    <img src="assets/screen-03-organization-unites.png" alt="إعداد المؤسسة - الوحدات" />
+    <ol>
+      <li>اضغط "إضافة وحدة" لإنشاء وحدة جديدة.</li>
+      <li>أدخل بيانات الوحدة واحفظ.</li>
+      <li>يمكن تعديل/حذف الوحدة من عمود الإجراءات.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h3>الصورة 5: تبويب الرتب</h3>
+    <img src="assets/screen-04-organization-grades.png" alt="إعداد المؤسسة - الرتب" />
+    <ol>
+      <li>اضغط "إضافة رتبة".</li>
+      <li>أدخل اسم الرتبة والرمز المرجعي.</li>
+      <li>احفظ الرتبة ثم اربطها لاحقا بالوظائف المناسبة.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h3>الصورة 6: تبويب الأعوام</h3>
+    <img src="assets/screen-05-organization-years.png" alt="إعداد المؤسسة - الأعوام" />
+    <ol>
+      <li>أضف سنة مالية جديدة عند بداية دورة تشغيل جديدة.</li>
+      <li>حدد إجمالي الحصص للسنة.</li>
+      <li>راجع حالة السنة (نشط/مغلق) من الجدول.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h3>الصورة 7: تبويب الحصص</h3>
+    <img src="assets/screen-06-organization-quotas.png" alt="إعداد المؤسسة - الحصص" />
+    <ol>
+      <li>اضغط "إضافة حصة".</li>
+      <li>اختر السنة والوحدة وحدد حد الحصة.</li>
+      <li>راجع الحصص الموزعة وتأكد من التوازن المطلوب.</li>
+    </ol>
+  </div>
+
+  <h2>5) الوظائف</h2>
+  <div class="card">
+    <h3>الصورة 8: سجل الوظائف</h3>
+    <img src="assets/screen-07-jobs.png" alt="سجل الوظائف" />
+    <ul>
+      <li>إضافة وظيفة جديدة عبر النموذج الجانبي.</li>
+      <li>إدخال اسم الوظيفة، الكود، السرية، العدد النظري.</li>
+      <li>اختيار الرتب المقبولة لهذه الوظيفة (اختيار متعدد).</li>
+      <li>مراجعة الجدول وتعديل/حذف أي وظيفة من الإجراءات.</li>
+    </ul>
+    <div class="box warn">تأكد من توافق الرتب المقبولة مع الأفراد لتفادي أخطاء التوزيع والتحويل.</div>
+  </div>
+
+  <h2>6) الأفراد</h2>
+  <div class="card">
+    <h3>الصورة 9: إدارة الموارد البشرية (الأفراد)</h3>
+    <img src="assets/screen-08-persons.png" alt="إدارة الأفراد" />
+    <ol>
+      <li>من نموذج "سجل جديد" أدخل: الاسم، اللقب، رقم التعريف.</li>
+      <li>اختر نوع العقد، الرتبة، الوحدة، السرية.</li>
+      <li>اضغط إنشاء لحفظ سجل الفرد.</li>
+      <li>راجع النتائج في جدول سجل الأفراد.</li>
+    </ol>
+  </div>
+
+  <h2>7) المصالح (Assignments)</h2>
+  <div class="card">
+    <h3>الصورة 10: صفحة المصالح</h3>
+    <img src="assets/screen-09-assignments.png" alt="صفحة المصالح" />
+    <ul>
+      <li>استخدم الفلاتر الذكية: الفرد، الدور الوظيفي، السنة، نوع العقد.</li>
+      <li>تابع جدول المصالح الحالية مع حالة كل توزيع.</li>
+      <li>يمكن التعديل أو الحذف من عمود الإجراءات.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>الصورة 11: نموذج إنشاء توزيع</h3>
+    <img src="assets/assignments-create.png" alt="إنشاء توزيع" />
+    <ol>
+      <li><span class="step">اختر الفرد</span> المراد توزيعه.</li>
+      <li><span class="step">اختر الدور الوظيفي</span> المناسب.</li>
+      <li><span class="step">اختر السنة المالية</span>.</li>
+      <li><span class="step">اضغط Deploy</span> لتأكيد التوزيع.</li>
+    </ol>
+    <div class="box ok">في النسخ الأحدث قد يختفي حقل نوع العقد من هذا النموذج حسب إعدادات الواجهة.</div>
+  </div>
+
+  <h2>8) التحويلات</h2>
+  <div class="card">
+    <h3>الصورة 12: مركز التحويل</h3>
+    <img src="assets/screen-10-transfer.png" alt="مركز التحويل" />
+    <ol>
+      <li>اختر الفرد المراد تحويله.</li>
+      <li>اختر وحدة الوجهة، ثم السرية والوظيفة عند الحاجة.</li>
+      <li>يمكن كتابة سبب التحويل (اختياري).</li>
+      <li>اضغط "تأكيد التحويل".</li>
+      <li>راجع "سجل التحويلات" للتحقق من نجاح العملية.</li>
+    </ol>
+    <div class="box">التحويلات المقترحة تُعرض عند توفر شروط الفائض/العجز وتوافق الرتبة، ثم تعتمد يدويا.</div>
+  </div>
+
+  <h2>9) الربح والخسارة</h2>
+  <div class="card">
+    <h3>الصورة 13: لوحة الربح والخسارة</h3>
+    <img src="assets/screen-11-gain-loss.png" alt="لوحة الربح والخسارة" />
+    <ul>
+      <li>القسم الأخضر: الربح (توظيف جديد + تحويلات داخل).</li>
+      <li>القسم الأحمر: الخسارة (حذف + تحويلات خارج).</li>
+      <li>الجدول السفلي: حركة التحويل من وحدة إلى وحدة مع السبب والتاريخ.</li>
+      <li>استخدم الفلاتر حسب الوحدة أو السرية لعرض أدق.</li>
+    </ul>
+  </div>
+
+  <h2>10) تسلسل عمل مقترح</h2>
+  <div class="card">
+    <ol>
+      <li>إدارة الحسابات والصلاحيات أولا.</li>
+      <li>ضبط إعداد المؤسسة: سرايا، وحدات، رتب، سنوات، حصص.</li>
+      <li>تعريف الوظائف وربطها بالرتب المقبولة.</li>
+      <li>إدخال الأفراد وربطهم بالكيانات الصحيحة.</li>
+      <li>إنشاء المصالح (التوزيع) حسب السنة المالية.</li>
+      <li>تنفيذ التحويلات عند الحاجة ومتابعة السجل.</li>
+      <li>متابعة الربح والخسارة لاتخاذ قرارات التحسين.</li>
+    </ol>
+  </div>
+
+  <p class="footer-note">تم تحديث الدليل ليشمل جميع لقطات الشاشة الموجودة في المسار: C:\Users\User\Pictures\Screenshots.</p>
+</body>
+</html>
+
+
+
+
+

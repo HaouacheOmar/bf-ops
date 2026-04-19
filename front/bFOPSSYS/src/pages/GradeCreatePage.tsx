@@ -3,9 +3,11 @@ import { api } from '../api'; // Swapped out createGrade to use api directly
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import StarIcon from '@mui/icons-material/Star';
+import { useI18n } from '../i18n/translator';
 import '../styles/layout.css';
 
 const GradeCreatePage: React.FC = () => {
+  const { t } = useI18n();
   const [grades, setGrades] = useState<any[]>([]);
   const [error, setError] = useState('');
   
@@ -48,7 +50,7 @@ const GradeCreatePage: React.FC = () => {
       }
       closeForm();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Error saving grade');
+      setError(err?.response?.data?.detail || t('Error saving grade'));
     }
   };
 
@@ -60,7 +62,7 @@ const GradeCreatePage: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if(window.confirm("Delete this grade?")) {
+    if(window.confirm(t('Delete this grade?'))) {
       await api.delete(`/grades/${id}/`);
       // OPTIMISTIC UPDATE
       setGrades(grades.filter(g => g.id !== id));
@@ -71,32 +73,32 @@ const GradeCreatePage: React.FC = () => {
     <div className="assignments-page-container">
       <header className="page-header">
         <div className="page-title">
-          <h1>Employee Grades</h1>
-          <span className="breadcrumb">Settings &gt; <span className="breadcrumb-active">Grades Dictionary</span></span>
+          <h1>{t('Employee Grades')}</h1>
+          <span className="breadcrumb">{t('Settings')} &gt; <span className="breadcrumb-active">{t('Grades Dictionary')}</span></span>
         </div>
       </header>
 
       <div className="top-grid" style={{gridTemplateColumns: '300px'}}>
         <div className="card">
-          <h2 className="card-title">New Grade</h2>
-          <p className="card-subtitle">Define a new employee seniority grade.</p>
+          <h2 className="card-title">{t('New Grade')}</h2>
+          <p className="card-subtitle">{t('Define a new employee seniority grade.')}</p>
           <button className="btn btn-primary" style={{ width: '100%' }} onClick={openNewForm}>
-            <StarIcon fontSize="small" /> Add Grade
+            <StarIcon fontSize="small" /> {t('Add Grade')}
           </button>
         </div>
       </div>
 
       <div className="card">
         <div className="table-header-row">
-          <h2 className="card-title" style={{marginBottom: '4px'}}>Grades Dictionary</h2>
+          <h2 className="card-title" style={{marginBottom: '4px'}}>{t('Grades Dictionary')}</h2>
         </div>
 
         <table className="custom-table">
           <thead>
             <tr>
-              <th>Grade Name</th>
-              <th>Reference Code</th>
-              <th style={{ width: '100px' }}>Actions</th>
+              <th>{t('Grade Name')}</th>
+              <th>{t('Reference Code')}</th>
+              <th style={{ width: '100px' }}>{t('Actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -119,20 +121,20 @@ const GradeCreatePage: React.FC = () => {
       {isFormOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2 style={{marginTop: 0, marginBottom: '24px'}}>{editing ? 'Edit Grade' : 'Create Grade'}</h2>
+            <h2 style={{marginTop: 0, marginBottom: '24px'}}>{editing ? t('Edit Grade') : t('Create Grade')}</h2>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label>Grade Name</label>
+                <label>{t('Grade Name')}</label>
                 <input type="text" className="filter-select" value={form.name} onChange={(e) => setForm({...form, name: e.target.value})} required />
               </div>
               <div className="form-group">
-                <label>Grade Code</label>
+                <label>{t('Grade Code')}</label>
                 <input type="text" className="filter-select" value={form.code} onChange={(e) => setForm({...form, code: e.target.value})} required />
               </div>
               {error && <p style={{ color: '#ef4444', fontSize: '12px' }}>{error}</p>}
               <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={closeForm}>Cancel</button>
-                <button type="submit" className="btn btn-primary">{editing ? 'Update' : 'Save'}</button>
+                <button type="button" className="btn btn-outline" onClick={closeForm}>{t('Cancel')}</button>
+                <button type="submit" className="btn btn-primary">{editing ? t('Update') : t('Save')}</button>
               </div>
             </form>
           </div>

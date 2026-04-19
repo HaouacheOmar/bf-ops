@@ -41,7 +41,7 @@ class Company(models.Model):
         return self.name
 
 class Job(models.Model):
-    name = models.CharField(max_length=200, unique=True)
+    name = models.CharField(max_length=200)
     code = models.CharField(max_length=50, unique=True)
     company = models.ForeignKey(
         Company,
@@ -56,6 +56,12 @@ class Job(models.Model):
 
     class Meta:
         ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company", "name"],
+                name="unique_job_name_per_company",
+            ),
+        ]
 
     def __str__(self):
         return self.name
@@ -84,6 +90,45 @@ class UniteQuota(models.Model):
         return f"{self.unite.name} - {self.year.year}: {self.quota}"
 
 class Person(models.Model):
+    first_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150)
+    national_id = models.CharField(max_length=50, unique=True)
+    grade = models.ForeignKey(
+        Grade,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="persons"
+    )
+    unite = models.ForeignKey(
+        Unite,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="persons"
+    )
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="persons"
+    )
+    job = models.ForeignKey(
+        Job,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="persons"
+    )
+    contract_type = models.CharField(
+        max_length=20,
+        choices=(
+            ("actif", "Actif"),
+            ("contractuel", "Contractuel"),
+        ),
+        default="actif"
+    )
     CONTRACT_CHOICES = [
         ('actif', 'Actif'),
         ('contractuel', 'Contractuel'),

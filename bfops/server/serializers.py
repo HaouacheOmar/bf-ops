@@ -10,8 +10,8 @@ class UniteQuotaSerializer(serializers.ModelSerializer):
 class TransferHistorySerializer(serializers.ModelSerializer):
     from_unite_name = serializers.CharField(source="from_unite.name", read_only=True)
     to_unite_name = serializers.CharField(source="to_unite.name", read_only=True)
-    from_company_name = serializers.CharField(source="from_company.name", read_only=True)
-    to_company_name = serializers.CharField(source="to_company.name", read_only=True)
+    from_company_name = serializers.CharField(source="assignment.job.company.name", read_only=True)
+    to_company_name = serializers.SerializerMethodField()
     person_name = serializers.CharField(source="assignment.person.__str__", read_only=True)
     job_name = serializers.CharField(source="assignment.job.name", read_only=True)
     year_value = serializers.IntegerField(source="assignment.year.year", read_only=True)
@@ -19,37 +19,64 @@ class TransferHistorySerializer(serializers.ModelSerializer):
     class Meta:
         model = TransferHistory
         fields = [
-            "id", "assignment", "person_name", "job_name", "year_value",
-            "from_unite", "from_unite_name", "to_unite", "to_unite_name",
-            "from_company", "from_company_name", "to_company", "to_company_name",
-            "transfer_date", "reason",
+            "id",
+            "assignment",
+            "person_name",
+            "job_name",
+            "year_value",
+            "from_unite",
+            "from_unite_name",
+            "from_company_name",
+            "to_unite",
+            "to_unite_name",
+            "to_company_name",
+            "transfer_date",
+            "reason",
         ]
 
-class CompanySerializer(serializers.ModelSerializer):
-    unite_name = serializers.CharField(source="unite.name", read_only=True)
-    services_count = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Company
-        fields = ["id", "name", "code", "unite", "unite_name", "created_at", "services_count"]
-
-    def get_services_count(self, obj):
-        # Count how many jobs are tied to this company
-        return obj.jobs.count()
+    def get_to_company_name(self, obj):
+        """Extract the destination company name from the to_unite's companies"""
+        if obj.to_unite:
+            companies = obj.to_unite.companies.all()
+            if companies.exists():
+                return companies.first().name
+        return "-"
 
 class JobSerializer(serializers.ModelSerializer):
+    accepted_grades_info = serializers.SerializerMethodField()
     company_name = serializers.CharField(source="company.name", read_only=True)
-    unite_name = serializers.CharField(source="company.unite.name", read_only=True)
-    grade_name = serializers.CharField(source="grade.name", read_only=True)
 
     class Meta:
         model = Job
-        fields = ["id", "name", "code", "company", "company_name", "unite_name", "grade", "grade_name", "max_workers", "created_at"]
+        fields = [
+            "id",
+            "name",
+            "code",
+            "company",
+            "company_name",
+            "grades", 
+            "accepted_grades_info", 
+            "max_workers",
+            "created_at",
+        ]
 
-class YearSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Year
-        fields = ["id", "year", "created_at"]
+    def get_accepted_grades_info(self, obj):
+        return [{"id": g.id, "name": g.name} for g in obj.grades.all()]
+
+    def validate(self, attrs):
+        name = attrs.get("name", getattr(self.instance, "name", None))
+        company = attrs.get("company", getattr(self.instance, "company", None))
+
+        if name and company:
+            duplicate_qs = Job.objects.filter(company=company, name=name)
+            if self.instance:
+                duplicate_qs = duplicate_qs.exclude(id=self.instance.id)
+            if duplicate_qs.exists():
+                raise serializers.ValidationError({
+                    "name": "This job name already exists in the selected company."
+                })
+
+        return attrs
 
 class GradeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -70,13 +97,32 @@ class PersonSerializer(serializers.ModelSerializer):
 class AssignmentSerializer(serializers.ModelSerializer):
     person_name = serializers.CharField(source="person.__str__", read_only=True)
     job_name = serializers.CharField(source="job.name", read_only=True)
-    unite_name = serializers.CharField(source="job.company.unite.name", read_only=True)
+    company_id = serializers.IntegerField(source="job.company.id", read_only=True)
     company_name = serializers.CharField(source="job.company.name", read_only=True)
+    unite_id = serializers.IntegerField(source="job.company.unite.id", read_only=True)
+    unite_name = serializers.CharField(
+        source="job.company.unite.name",
+        read_only=True,
+        default="Aucune unité"
+    )
     year_value = serializers.IntegerField(source="year.year", read_only=True)
 
     class Meta:
         model = Assignment
-        fields = ["id", "person", "person_name", "job", "job_name", "unite_name", "company_name", "year", "year_value", "created_at"]
+        fields = [
+            "id",
+            "person",
+            "job",
+            "year",
+            "person_name",
+            "job_name",
+            "company_id",
+            "company_name",
+            "unite_id",
+            "unite_name",
+            "year_value",
+            "created_at",
+        ]
 
     def validate(self, data):
         job = data.get("job")

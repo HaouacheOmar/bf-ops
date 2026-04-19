@@ -1,11 +1,16 @@
 /* src/styles/assignments.css */
 
 .assignments-page-container {
-  padding: 24px 32px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: clamp(12px, 2vw, 24px) clamp(12px, 2.5vw, 32px);
   background-color: #f7f8fa;
-  min-height: 100vh;
+  min-height: calc(100vh - 64px);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   color: #1a1b1f;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 /* Header */
@@ -13,17 +18,21 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .page-title {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .page-title h1 {
-  font-size: 24px;
+  font-size: clamp(20px, 2.4vw, 24px);
   font-weight: 700;
   margin: 0;
   color: #111827;
@@ -41,7 +50,9 @@
 
 .search-bar-wrapper {
   position: relative;
-  width: 280px;
+  width: min(100%, 320px);
+  min-width: 220px;
+  margin-left: auto;
 }
 
 .search-bar-wrapper input {
@@ -62,16 +73,18 @@
 /* Top Grid (Create & Filters) */
 .top-grid {
   display: grid;
-  grid-template-columns: 300px 1fr;
-  gap: 24px;
-  margin-bottom: 24px;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 .card {
   background-color: white;
   border-radius: 12px;
-  padding: 24px;
+  padding: clamp(14px, 2vw, 24px);
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .card-title {
@@ -130,14 +143,16 @@
 /* Filters Row */
 .filters-row {
   display: flex;
-  gap: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .filter-group {
-  flex: 1;
+  flex: 1 1 180px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .filter-label {
@@ -163,17 +178,20 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .custom-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: auto;
 }
 
 .custom-table th {
   text-align: left;
-  padding: 12px 16px;
+  padding: 10px 12px;
   font-size: 11px;
   font-weight: 700;
   color: #9ca3af;
@@ -182,7 +200,7 @@
 }
 
 .custom-table td {
-  padding: 16px;
+  padding: 12px;
   font-size: 14px;
   color: #374151;
   border-bottom: 1px solid #f3f4f6;
@@ -193,6 +211,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .avatar {
@@ -207,7 +226,7 @@
 .avatar.orange { background-color: #ffedd5; color: #c2410c; }
 
 .info-block h4 { margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: #111827; }
-.info-block p { margin: 0; font-size: 12px; color: #6b7280; }
+.info-block p { margin: 0; font-size: 12px; color: #6b7280; word-break: break-word; }
 
 /* Status Pills */
 .status-pill {
@@ -232,9 +251,9 @@
 /* Stats Bottom Grid */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-  margin-top: 24px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
 }
 
 .stat-card {
@@ -274,7 +293,10 @@
 
 .modal-content {
   background: white; padding: 32px; border-radius: 12px;
-  width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  width: min(96vw, 560px);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
 }
 
 .form-group { margin-bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
@@ -283,3 +305,84 @@
 .form-group select:focus { border-color: #3b50df; }
 
 .modal-actions { display: flex; gap: 12px; margin-top: 24px; justify-content: flex-end; }
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .top-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .search-bar-wrapper {
+    width: 100%;
+    min-width: 0;
+    margin-left: 0;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .assignments-page-container {
+    padding: 12px;
+  }
+
+  .page-header {
+    align-items: stretch;
+  }
+
+  .page-title {
+    gap: 6px;
+  }
+
+  .page-title h1 {
+    width: 100%;
+  }
+
+  .breadcrumb {
+    display: block;
+    width: 100%;
+    line-height: 1.4;
+  }
+
+  .table-header-row .btn {
+    width: 100%;
+  }
+
+  .custom-table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .custom-table thead,
+  .custom-table tbody,
+  .custom-table tr {
+    white-space: nowrap;
+  }
+
+  .custom-table th,
+  .custom-table td {
+    padding: 10px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-content {
+    width: min(96vw, 560px);
+    padding: 16px;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .modal-actions .btn {
+    width: 100%;
+  }
+}
