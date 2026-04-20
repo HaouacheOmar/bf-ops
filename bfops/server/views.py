@@ -1,6 +1,7 @@
 from urllib.parse import urlencode
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
+from django.db.models import Prefetch
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
@@ -70,9 +71,8 @@ class UniteQuotaViewSet(viewsets.ModelViewSet):
     queryset = UniteQuota.objects.select_related("year", "unite").all()
     serializer_class = UniteQuotaSerializer
 
-
 class TransferHistoryViewSet(viewsets.ModelViewSet):
-    queryset = TransferHistory.objects.select_related("assignment", "from_unite", "to_unite", "from_company", "to_company").all()
+    queryset = TransferHistory.objects.select_related("assignment", "from_unite", "to_unite").all()
     serializer_class = TransferHistorySerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = {
@@ -81,63 +81,6 @@ class TransferHistoryViewSet(viewsets.ModelViewSet):
     }
     search_fields = ['reason']
     ordering_fields = ['transfer_date', 'from_unite', 'to_unite']
-
-    @action(detail=False, methods=['post'], url_path='execute')
-    @transaction.atomic
-    def execute_transfer(self, request):
-        assignment_id = request.data.get('assignment_id')
-        new_unite_id = request.data.get('new_unite_id')
-        new_company_id = request.data.get('new_company_id')
-        reason = request.data.get('reason', 'Transfert')
-
-        if not all([assignment_id, new_unite_id, new_company_id]):
-            return Response({"error": "Veuillez fournir l'affectation, l'unité et la compagnie de destination."}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            assignment = Assignment.objects.select_related('job__company__unite').get(id=assignment_id)
-            new_unite = Unite.objects.get(id=new_unite_id)
-            new_company = Company.objects.get(id=new_company_id, unite=new_unite) 
-        except Assignment.DoesNotExist:
-            return Response({"error": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
-        except Unite.DoesNotExist:
-            return Response({"error": "Destination Unite not found."}, status=status.HTTP_404_NOT_FOUND)
-        except Company.DoesNotExist:
-            return Response({"error": "La compagnie sélectionnée n'existe pas ou n'appartient pas à l'unité choisie."}, status=status.HTTP_400_BAD_REQUEST)
-
-        old_job = assignment.job
-        old_company = old_job.company
-        old_unite = old_company.unite
-
-        # Check only if old_company == new_company to allow internal same-unit transfers
-        if old_company == new_company:
-            return Response({"error": "Le travailleur est déjà dans cette compagnie."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Create the pending job inside the selected company
-        pending_job, _ = Job.objects.get_or_create(
-            company=new_company, 
-            name="En attente d'affectation", 
-            defaults={"code": f"ATT-{new_company.code}", "max_workers": 999}
-        )
-
-        Loss.objects.create(person=assignment.person, year=assignment.year, unite=old_unite, company=old_company)
-        Gain.objects.create(person=assignment.person, year=assignment.year, unite=new_unite, company=new_company)
-
-        # Create the TransferHistory record
-        TransferHistory.objects.create(
-            assignment=assignment, 
-            from_unite=old_unite, 
-            to_unite=new_unite, 
-            from_company=old_company, 
-            to_company=new_company, 
-            reason=reason
-        )
-
-        # Update the Assignment 
-        assignment.job = pending_job
-        assignment.save()
-
-        return Response({"message": f"Transfert réussi vers la compagnie {new_company.name}."}, status=status.HTTP_200_OK)
-
 
 class AssignmentViewSet(viewsets.ModelViewSet):
     queryset = Assignment.objects.select_related("person", "job", "year").all()
@@ -172,6 +115,7 @@ class UniteViewSet(viewsets.ModelViewSet):
     ordering_fields = ['name', 'created_at']
 
     def list(self, request, *args, **kwargs):
+        # FIX: Use urlencode with sorted parameters for a stable cache key
         query_string = urlencode(sorted(request.query_params.items()))
         key = f"unites:{query_string}"
         
@@ -259,10 +203,21 @@ class YearViewSet(viewsets.ModelViewSet):
     ordering_fields = ['year', 'created_at']
 
 class PersonViewSet(viewsets.ModelViewSet):
-    queryset = Person.objects.all()
+    queryset = Person.objects.select_related(
+        "grade",
+        "unite",
+        "company",
+        "job",
+    ).prefetch_related(
+        Prefetch(
+            "assignments",
+            queryset=Assignment.objects.select_related("job__company__unite", "year").order_by("-year__year", "-created_at"),
+            to_attr="prefetched_assignments",
+        )
+    )
     serializer_class = PersonSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['first_name', 'last_name', 'national_id']
+    search_fields = ['first_name', 'last_name', 'matricule']
     ordering_fields = ['last_name', 'first_name', 'created_at']
 
     @action(detail=False, methods=['post'])
@@ -275,6 +230,7 @@ class PersonViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+# Gain/Loss views only need Read-Only access 
 class GainViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Gain.objects.select_related("person", "unite", "company", "year").all()
     serializer_class = GainSerializer

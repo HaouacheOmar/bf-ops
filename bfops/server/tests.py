@@ -60,7 +60,7 @@ class TransferSuggestionTests(TestCase):
 			person = Person.objects.create(
 				first_name=f"P{idx}",
 				last_name="Worker",
-				national_id=f"NID-{idx}",
+				matricule=f"NID-{idx}",
 				grade=self.grade_x,
 				unite=self.unite_a,
 				company=self.company_a1,
@@ -208,7 +208,7 @@ class StatsAggregationTests(TestCase):
 			person = Person.objects.create(
 				first_name=f"Cmd{idx}",
 				last_name="Worker",
-				national_id=f"CMD-{idx}",
+				matricule=f"CMD-{idx}",
 				unite=self.unite,
 				company=self.commandement,
 				job=self.job_commandement,
@@ -219,7 +219,7 @@ class StatsAggregationTests(TestCase):
 			person = Person.objects.create(
 				first_name=f"Mnw{idx}",
 				last_name="Worker",
-				national_id=f"MNW-{idx}",
+				matricule=f"MNW-{idx}",
 				unite=self.unite,
 				company=self.mounawara,
 				job=self.job_mounawara,

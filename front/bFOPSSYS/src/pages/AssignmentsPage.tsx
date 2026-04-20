@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, Snackbar } from '@mui/material';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import EditIcon from '@mui/icons-material/Edit';
@@ -7,6 +7,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import PersonAddAlt1Icon from '@mui/icons-material/PersonAddAlt1';
 import SearchIcon from '@mui/icons-material/Search';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { getJobs } from '../api-jobs';
 import { useI18n } from '../i18n/translator';
 import '../styles/layout.css';
@@ -18,6 +19,7 @@ interface Assignment {
   job: number;
   job_name: string;
   company_name: string;
+  unite_name?: string;
   year: number;
   year_value: number;
   contract_type: string;
@@ -30,6 +32,7 @@ const AssignmentsPage = () => {
   const [persons, setPersons] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [years, setYears] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
   const [allJobs, setAllJobs] = useState<any[]>([]);
   const [filter, setFilter] = useState('');
   
@@ -44,7 +47,18 @@ const AssignmentsPage = () => {
   
   const [gradePopup, setGradePopup] = useState(false);
   const [gradePopupMsg, setGradePopupMsg] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [warningOpen, setWarningOpen] = useState(false);
+  const [warningMsg, setWarningMsg] = useState('');
   const selectedPerson = persons.find(p => String(p.id) === String(form.person));
+
+  const normalizeText = (value: any) => String(value ?? '').trim().toLowerCase();
+
+  const openWarning = (message: string) => {
+    setWarningMsg(message);
+    setWarningOpen(true);
+  };
 
   const fetchAssignments = async () => {
     const params: any = {};
@@ -68,14 +82,16 @@ const AssignmentsPage = () => {
   };
 
   const fetchOptions = async () => {
-    const [p, y, j] = await Promise.all([
+    const [p, y, j, c] = await Promise.all([
       axios.get('/api/persons/'),
       axios.get('/api/years/'),
       axios.get('/api/jobs/'),
+      axios.get('/api/companies/'),
     ]);
     setPersons(p.data.results || p.data); 
     setYears(y.data.results || y.data);
     setAllJobs(j.data.results || j.data);
+    setCompanies(c.data.results || c.data);
   };
 
   const fetchJobsForPersonCompany = async (companyId?: number) => {
@@ -207,6 +223,127 @@ const AssignmentsPage = () => {
     XLSX.writeFile(workbook, filename);
   };
 
+  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBulkUploading(true);
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      const requiredColumns = ['first_name', 'last_name', 'matricule', 'job title', 'company', 'unite', 'year'];
+      if (rows.length > 0) {
+        const presentColumns = Object.keys(rows[0]).map((key) => normalizeText(key));
+        const missingColumns = requiredColumns.filter((col) => !presentColumns.includes(col));
+        if (missingColumns.length > 0) {
+          openWarning(`Missing required columns: ${missingColumns.join(', ')}`);
+          return;
+        }
+      }
+
+      const personByMatricule = new Map<string, any>();
+      persons.forEach((person) => {
+        const key = normalizeText(person.matricule || person.national_id);
+        if (key) personByMatricule.set(key, person);
+      });
+
+      const yearByValue = new Map<string, any>();
+      years.forEach((year) => {
+        yearByValue.set(String(year.year).trim(), year);
+        yearByValue.set(String(year.id).trim(), year);
+      });
+
+      const jobsByName = new Map<string, any[]>();
+      allJobs.forEach((job) => {
+        const key = normalizeText(job.name);
+        const current = jobsByName.get(key) || [];
+        current.push(job);
+        jobsByName.set(key, current);
+      });
+
+      const missingPersons: string[] = [];
+      const missingJobs: string[] = [];
+      const invalidYears: string[] = [];
+      const payloads: Array<{ person: number; job: number; year: number }> = [];
+
+      rows.forEach((row, index) => {
+        const rowNum = index + 2;
+
+        const matricule = row.matricule || row.Matricule;
+        const jobTitle = row['job title'] || row['Job Title'] || row.job_title || row.JobTitle;
+        const companyName = row.company || row.Company;
+        const uniteName = row.unite || row.Unite;
+        const yearValue = row.year || row.Year;
+
+        const person = personByMatricule.get(normalizeText(matricule));
+        if (!person) {
+          missingPersons.push(`Row ${rowNum} (${matricule || '-'})`);
+          return;
+        }
+
+        const jobNameKey = normalizeText(jobTitle);
+        const candidates = jobsByName.get(jobNameKey) || [];
+        const filteredByCompany = normalizeText(companyName)
+          ? candidates.filter((job) => normalizeText(job.company_name) === normalizeText(companyName))
+          : candidates;
+
+        const filteredByUnite = normalizeText(uniteName)
+          ? filteredByCompany.filter((job) => {
+              const matchCompany = companies.find((company) => String(company.id) === String(job.company));
+              return normalizeText(matchCompany?.unite_name || matchCompany?.unite || '') === normalizeText(uniteName)
+                || normalizeText(person.unite_name) === normalizeText(uniteName);
+            })
+          : filteredByCompany;
+
+        const selectedJob = filteredByUnite[0] || filteredByCompany[0] || candidates[0];
+        if (!selectedJob) {
+          missingJobs.push(`Row ${rowNum} (${jobTitle || '-'})`);
+          return;
+        }
+
+        const year = yearByValue.get(String(yearValue).trim());
+        if (!year) {
+          invalidYears.push(`Row ${rowNum} (${yearValue || '-'})`);
+          return;
+        }
+
+        payloads.push({
+          person: Number(person.id),
+          job: Number(selectedJob.id),
+          year: Number(year.id),
+        });
+      });
+
+      if (missingPersons.length || missingJobs.length || invalidYears.length) {
+        const warningLines: string[] = [];
+        if (missingPersons.length) warningLines.push(`${t('Missing person')}: ${missingPersons.join(', ')}`);
+        if (missingJobs.length) warningLines.push(`${t('Missing job')}: ${missingJobs.join(', ')}`);
+        if (invalidYears.length) warningLines.push(`${t('Check the year assignment')}: ${invalidYears.join(', ')}`);
+        openWarning(warningLines.join('\n'));
+        return;
+      }
+
+      const results = await Promise.allSettled(
+        payloads.map((payload) => axios.post('/api/assignments/', payload))
+      );
+
+      const failed = results.filter((result) => result.status === 'rejected') as PromiseRejectedResult[];
+      if (failed.length > 0) {
+        openWarning(`${failed.length} row(s) failed to upload.`);
+      }
+
+      await fetchAssignments();
+    } catch (error: any) {
+      openWarning(error?.message || t('Unknown error'));
+    } finally {
+      setBulkUploading(false);
+      e.target.value = '';
+    }
+  };
+
   return (
     <div className="assignments-page-container">
       
@@ -218,6 +355,22 @@ const AssignmentsPage = () => {
           <Button onClick={() => setGradePopup(false)}>{t('OK')}</Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={warningOpen}
+        autoHideDuration={7000}
+        onClose={() => setWarningOpen(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setWarningOpen(false)}
+          severity="warning"
+          variant="filled"
+          sx={{ whiteSpace: 'pre-line' }}
+        >
+          {warningMsg}
+        </Alert>
+      </Snackbar>
 
       {/* Header */}
       <header className="page-header">
@@ -316,9 +469,25 @@ const AssignmentsPage = () => {
             <h2 className="card-title" style={{marginBottom: '4px'}}>{t('Current Assignments')}</h2>
             <p className="card-subtitle" style={{margin: 0}}>{assignments.length} {t('active professional mappings recorded')}</p>
           </div>
-          <button className="btn btn-outline" onClick={handleExport}>
-            <DownloadIcon fontSize="small" /> {t('Export')}
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              ref={fileInputRef}
+              onChange={handleExcelUpload}
+              style={{ display: 'none' }}
+            />
+            <button
+              className="btn btn-outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={bulkUploading}
+            >
+              <UploadFileIcon fontSize="small" /> {bulkUploading ? t('Uploading...') : t('Bulk Upload (Excel)')}
+            </button>
+            <button className="btn btn-outline" onClick={handleExport}>
+              <DownloadIcon fontSize="small" /> {t('Export')}
+            </button>
+          </div>
         </div>
 
         <table className="custom-table">
@@ -347,7 +516,7 @@ const AssignmentsPage = () => {
                 <td>
                   <div className="info-block">
                     <h4>{a.company_name}</h4>
-                      <p>{t('Assigned Unit')}</p>
+                    <p>{a.unite_name || '-'}</p>
                   </div>
                 </td>
                 <td>{a.job_name}</td>

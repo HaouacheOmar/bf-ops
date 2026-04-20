@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { 
   Dialog, DialogTitle, DialogContent, DialogActions, Button, 
-  Table, TableHead, TableRow, TableCell, TableBody, Typography, Box, IconButton, Tooltip 
+  Table, TableHead, TableRow, TableCell, TableBody, Typography, Tooltip 
 } from '@mui/material';
 import * as XLSX from 'xlsx';
 import { bulkCreateJobs } from '../api-jobs'; 
@@ -82,10 +82,37 @@ const JobsPage = () => {
       : JSON.stringify(details || t('Unknown error'));
   };
 
+  const sanitizeCodeSegment = (value: string) => {
+    return value
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  };
+
+  const deriveBaseCodeFromName = (name: string) => {
+    const derived = sanitizeCodeSegment(name);
+    return derived || 'JOB';
+  };
+
+  const buildUniqueCode = (baseCode: string, reservedCodes: Set<string>) => {
+    const normalizedBase = baseCode.trim() || 'JOB';
+
+    let candidate = normalizedBase;
+    let counter = 2;
+    while (reservedCodes.has(candidate)) {
+      candidate = `${normalizedBase}-${counter}`;
+      counter += 1;
+    }
+
+    reservedCodes.add(candidate);
+    return candidate;
+  };
+
   const buildUniqueJobCode = (baseCode: string, companyId: number, reservedCodes: Set<string>) => {
     const company = companies.find(c => c.id === companyId);
-    const companySuffix = (company?.code || `C${companyId}`).replace(/\s+/g, '').toUpperCase();
-    const baseCandidate = `${baseCode}-${companySuffix}`;
+    const companySuffix = sanitizeCodeSegment(company?.code || `C${companyId}`) || `C${companyId}`;
+    const normalizedBase = baseCode.trim() || 'JOB';
+    const baseCandidate = `${normalizedBase}-${companySuffix}`;
 
     let candidate = baseCandidate;
     let counter = 2;
@@ -110,6 +137,7 @@ const JobsPage = () => {
       
       const records: any[] = [];
       const errors: string[] = [];
+      const reservedCodes = new Set(jobs.map(j => j.code));
 
       json.forEach((row, index) => {
         const rowNum = index + 2;
@@ -145,9 +173,15 @@ const JobsPage = () => {
           }
         }
 
+        const providedCode = String(row.code || row.Code || '').trim();
+        const generatedBaseCode = deriveBaseCodeFromName(String(row.name || row.Name || ''));
+        const generatedCode = companyId
+          ? buildUniqueJobCode(generatedBaseCode, companyId, reservedCodes)
+          : buildUniqueCode(generatedBaseCode, reservedCodes);
+
         records.push({
           name: row.name || row.Name || '',
-          code: row.code || row.Code || '',
+          code: providedCode || generatedCode,
           company: companyId || '',
           grades: gradesIds,
           max_workers: row.max_workers || row.MaxWorkers || row['Max Workers'] || '',
@@ -260,23 +294,22 @@ const JobsPage = () => {
 
     try {
       if (editing) {
-        const baseCode = form.code.trim();
+        const baseCode = form.code.trim() || deriveBaseCodeFromName(form.name);
         const reservedCodes = new Set(jobs.filter(j => j.id !== editing.id).map(j => j.code));
         const primaryCompanyId = selectedCompanyIds.includes(editing.company)
           ? editing.company
           : selectedCompanyIds[0];
         const additionalCompanyIds = selectedCompanyIds.filter(id => id !== primaryCompanyId);
+        const primaryCode = buildUniqueCode(baseCode, reservedCodes);
 
         const payload = {
           name: form.name,
-          code: baseCode,
+          code: primaryCode,
           grades: form.grades.map(Number),
           max_workers: maxByCompany[primaryCompanyId],
           company: primaryCompanyId,
         };
         await axios.put(`/api/jobs/${editing.id}/`, payload);
-
-        reservedCodes.add(baseCode);
 
         for (let idx = 0; idx < additionalCompanyIds.length; idx += 1) {
           const companyId = additionalCompanyIds[idx];
@@ -293,13 +326,13 @@ const JobsPage = () => {
 
         setEditing(null);
       } else {
-        const baseCode = form.code.trim();
+        const baseCode = form.code.trim() || deriveBaseCodeFromName(form.name);
         const reservedCodes = new Set(jobs.map(j => j.code));
 
         for (let idx = 0; idx < selectedCompanyIds.length; idx += 1) {
           const companyId = selectedCompanyIds[idx];
           const jobCode = selectedCompanyIds.length === 1
-            ? baseCode
+            ? buildUniqueCode(baseCode, reservedCodes)
             : buildUniqueJobCode(baseCode, companyId, reservedCodes);
 
           const payload = {
@@ -489,7 +522,10 @@ const JobsPage = () => {
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">{t('Job Code')}</label>
-                  <input type="text" className="form-input" placeholder="DAT-001" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} required />
+                  <input type="text" className="form-input" placeholder="DAT-001" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} />
+                  <small style={{ color: '#6b7280' }}>
+                    {t('Leave empty to auto-generate a unique code.')}
+                  </small>
                 </div>
                 <div className="form-group">
                   <label className="form-label">{t('Max Workers')}</label>

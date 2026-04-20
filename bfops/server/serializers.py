@@ -81,18 +81,136 @@ class JobSerializer(serializers.ModelSerializer):
 class GradeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Grade
-        fields = ["id", "name", "code", "created_at"]
+        fields = [
+            "id",
+            "name",
+            "code",
+            "created_at",
+        ]
 
 class UniteSerializer(serializers.ModelSerializer):
+    companies_count = serializers.IntegerField(
+        source="companies.count",
+        read_only=True
+    )
     class Meta:
         model = Unite
-        fields = ["id", "name", "code", "created_at"]
+        fields = [
+            "id",
+            "name",
+            "code",
+            "companies_count",
+            "created_at",
+        ]
+
+class CompanySerializer(serializers.ModelSerializer):
+    jobs_count = serializers.IntegerField(
+        source="jobs.count",
+        read_only=True
+    )
+    unite = serializers.PrimaryKeyRelatedField(queryset=Unite.objects.all(), required=False, allow_null=True)
+    unite_name = serializers.CharField(source="unite.name", read_only=True)
+    class Meta:
+        model = Company
+        fields = [
+            "id",
+            "name",
+            "code",
+            "unite",
+            "unite_name",
+            "jobs_count",
+            "created_at",
+        ]
+
+class YearSerializer(serializers.ModelSerializer):
+    unite_quotas = UniteQuotaSerializer(many=True, read_only=True)
+    class Meta:
+        model = Year
+        fields = [
+            "id",
+            "year",
+            "total_quota",
+            "is_closed",
+            "created_at",
+            "unite_quotas",
+        ]
 
 class PersonSerializer(serializers.ModelSerializer):
-    grade_name = serializers.CharField(source="grade.name", read_only=True)
+    full_name = serializers.SerializerMethodField()
+    unite_name = serializers.CharField(source="unite.name", read_only=True)
+    company_name = serializers.CharField(source="company.name", read_only=True)
+    job_name = serializers.CharField(source="job.name", read_only=True)
+
     class Meta:
         model = Person
-        fields = ["id", "first_name", "last_name", "national_id", "contract_type", "grade", "grade_name", "created_at"]
+        fields = [
+            "id",
+            "first_name",
+            "last_name",
+            "full_name",
+            "matricule",
+            "contract_type",
+            "grade",
+            "unite",
+            "company",
+            "job",
+            "unite_name",
+            "company_name",
+            "job_name"
+        ]
+
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}"
+
+    def to_internal_value(self, data):
+        # Accept legacy national_id payloads while migrating API clients to matricule.
+        incoming = data.copy() if hasattr(data, "copy") else data
+        if hasattr(incoming, "get"):
+            matricule_value = incoming.get("matricule")
+            legacy_national_id = incoming.get("national_id")
+            if (matricule_value is None or str(matricule_value).strip() == "") and legacy_national_id not in (None, ""):
+                incoming["matricule"] = legacy_national_id
+        return super().to_internal_value(incoming)
+
+    def _get_latest_assignment(self, obj):
+        prefetched_assignments = getattr(obj, "prefetched_assignments", None)
+        if prefetched_assignments is not None:
+            return prefetched_assignments[0] if prefetched_assignments else None
+
+        return (
+            obj.assignments
+            .select_related("job__company__unite", "year")
+            .order_by("-year__year", "-created_at")
+            .first()
+        )
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Keep legacy response compatibility while exposing matricule as canonical.
+        data["national_id"] = data.get("matricule", "")
+        latest_assignment = self._get_latest_assignment(instance)
+
+        if latest_assignment:
+            assignment_job = latest_assignment.job
+            assignment_company = assignment_job.company if assignment_job else None
+            assignment_unite = assignment_company.unite if assignment_company else None
+
+            if not data.get("job") and assignment_job:
+                data["job"] = assignment_job.id
+            if not data.get("job_name") and assignment_job:
+                data["job_name"] = assignment_job.name
+
+            if not data.get("company") and assignment_company:
+                data["company"] = assignment_company.id
+            if not data.get("company_name") and assignment_company:
+                data["company_name"] = assignment_company.name
+
+            if not data.get("unite") and assignment_unite:
+                data["unite"] = assignment_unite.id
+            if not data.get("unite_name") and assignment_unite:
+                data["unite_name"] = assignment_unite.name
+
+        return data
 
 class AssignmentSerializer(serializers.ModelSerializer):
     person_name = serializers.CharField(source="person.__str__", read_only=True)
@@ -125,34 +243,20 @@ class AssignmentSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
-        job = data.get("job")
-        person = data.get("person")
-        year = data.get("year")
+        person = data.get('person')
+        job = data.get('job')
         
-        if self.instance:
-            if job is None: job = self.instance.job
-            if person is None: person = self.instance.person
-            if year is None: year = self.instance.year
-            current_assignment_id = self.instance.id
-        else:
-            current_assignment_id = None
-
-        if job and year:
-            qs = Assignment.objects.filter(job=job, year=year)
-            if current_assignment_id:
-                qs = qs.exclude(id=current_assignment_id)
-            if qs.count() >= job.max_workers:
-                raise serializers.ValidationError(
-                    f"Job '{job.name}' has reached its maximum capacity of {job.max_workers} workers for year {year.year}."
-                )
-
-        if job and person:
-            if job.grade is not None:
-                if person.grade is None or person.grade != job.grade:
+        if person and job:
+            accepted_grades = job.grades.all()
+            
+            if accepted_grades.exists():
+                # If the job has required grades, the person MUST have one of them
+                if not person.grade or person.grade not in accepted_grades:
                     raise serializers.ValidationError(
                         "Person's grade does not match any of the accepted grades for this job."
                     )
             else:
+                # If the job requires NO grade, but the person has one
                 if person.grade is not None:
                     raise serializers.ValidationError(
                         "This job does not require a grade, but the person is assigned a grade."

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { 
   Dialog, DialogTitle, DialogContent, DialogActions, Button, 
-  Table, TableHead, TableRow, TableCell, TableBody, Typography, Box, IconButton, Tooltip 
+  Table, TableHead, TableRow, TableCell, TableBody, Typography, Tooltip 
 } from '@mui/material';
 import * as XLSX from 'xlsx';
 import { bulkCreatePersons } from '../api-persons';
@@ -20,7 +20,8 @@ interface Person {
   id: number;
   first_name: string;
   last_name: string;
-  national_id: string;
+  matricule: string;
+  national_id?: string;
   contract_type: 'actif' | 'contractuel';
   grade: number | null;
   grade_name?: string;
@@ -39,7 +40,7 @@ const PersonsPage = () => {
   const [editing, setEditing] = useState<Person | null>(null);
   
   const initialFormState = { 
-    first_name: '', last_name: '', national_id: '', 
+    first_name: '', last_name: '', matricule: '', 
     contract_type: 'actif', grade: '', unite: '', company: ''
   };
   const [form, setForm] = useState(initialFormState);
@@ -47,7 +48,6 @@ const PersonsPage = () => {
   const [grades, setGrades] = useState<any[]>([]);
   const [unites, setUnites] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
-  const [jobs, setJobs] = useState<any[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [bulkUploading, setBulkUploading] = useState(false);
@@ -57,13 +57,17 @@ const PersonsPage = () => {
     axios.get('/api/grades/').then(res => setGrades(res.data.results || res.data));
     axios.get('/api/unites/').then(res => setUnites(res.data.results || res.data));
     axios.get('/api/companies/').then(res => setCompanies(res.data.results || res.data));
-    axios.get('/api/jobs/').then(res => setJobs(res.data.results || res.data));
   }, []);
 
   const fetchPersons = async () => {
     const params = filter ? { search: filter } : undefined;
     const res = await axios.get('/api/persons/', { params });
-    setPersons(res.data.results || res.data);
+    const rows = res.data.results || res.data;
+    const normalized = rows.map((row: any) => ({
+      ...row,
+      matricule: row.matricule || row.national_id || '',
+    }));
+    setPersons(normalized);
   };
   
   useEffect(() => { fetchPersons(); }, [filter]);
@@ -78,6 +82,16 @@ const PersonsPage = () => {
       const workbook = XLSX.read(data);
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const json: any[] = XLSX.utils.sheet_to_json(sheet);
+
+      const requiredColumns = ['first_name', 'last_name', 'matricule', 'contract_type', 'grade', 'unite', 'company'];
+      if (json.length > 0) {
+        const firstRowKeys = Object.keys(json[0]).map((k) => String(k).trim());
+        const missing = requiredColumns.filter((col) => !firstRowKeys.includes(col));
+        if (missing.length > 0) {
+          alert(t('Upload aborted. Please fix the following errors in your Excel file:\n\n') + `Missing required columns: ${missing.join(', ')}`);
+          return;
+        }
+      }
       
       const records: any[] = [];
       const errors: string[] = [];
@@ -97,22 +111,19 @@ const PersonsPage = () => {
         const gradeId = findId(grades, row.grade || row.Grade);
         const uniteId = findId(unites, row.unite || row.Unite);
         const companyId = findId(companies, row.company || row.Company);
-        const jobId = findId(jobs, row.job || row.Job);
 
         if (gradeId === undefined) errors.push(`Row ${rowNum}: Grade "${row.grade}" not found.`);
         if (uniteId === undefined) errors.push(`Row ${rowNum}: Unite "${row.unite}" not found.`);
         if (companyId === undefined) errors.push(`Row ${rowNum}: Company "${row.company}" not found.`);
-        if (jobId === undefined) errors.push(`Row ${rowNum}: Job "${row.job}" not found.`);
 
         records.push({
           first_name: row.first_name || row.FirstName || '',
           last_name: row.last_name || row.LastName || '',
-          national_id: row.national_id || row.NationalID || '',
+          matricule: row.matricule || row.Matricule || row.national_id || row.NationalID || '',
           contract_type: row.contract_type || row.ContractType || 'actif',
           grade: gradeId || null,
           unite: uniteId || null,
           company: companyId || null,
-          job: jobId || null,
         });
       });
 
@@ -157,7 +168,7 @@ const PersonsPage = () => {
     setForm({
       first_name: person.first_name,
       last_name: person.last_name,
-      national_id: person.national_id,
+      matricule: person.matricule || person.national_id || '',
       contract_type: person.contract_type || 'actif',
       grade: person.grade ? String(person.grade) : '',
       unite: person.unite ? String(person.unite) : '',
@@ -242,8 +253,8 @@ const PersonsPage = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">{t('National ID')}</label>
-                <input type="text" className="form-input" placeholder="ID-000-00-0000" value={form.national_id} onChange={e => setForm(f => ({ ...f, national_id: e.target.value }))} required />
+                <label className="form-label">{t('Matricule')}</label>
+                <input type="text" className="form-input" placeholder="MAT-0001" value={form.matricule} onChange={e => setForm(f => ({ ...f, matricule: e.target.value }))} required />
               </div>
 
               <div className="form-group">
@@ -338,7 +349,7 @@ const PersonsPage = () => {
                         </div>
                         <div className="employee-info">
                           <h4>{person.first_name} {person.last_name}</h4>
-                          <p>{person.job_name || t('No Job Assigned')}</p>
+                          {person.job_name && <p>{person.job_name}</p>}
                         </div>
                       </div>
                     </td>
@@ -387,12 +398,11 @@ const PersonsPage = () => {
                 <TableRow>
                   <TableCell><strong>first_name</strong></TableCell>
                   <TableCell><strong>last_name</strong></TableCell>
-                  <TableCell><strong>national_id</strong></TableCell>
+                  <TableCell><strong>matricule</strong></TableCell>
                   <TableCell><strong>contract_type</strong></TableCell>
                   <TableCell><strong>grade</strong></TableCell>
                   <TableCell><strong>unite</strong></TableCell>
                   <TableCell><strong>company</strong></TableCell>
-                  <TableCell><strong>job</strong></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -404,7 +414,6 @@ const PersonsPage = () => {
                   <TableCell>capitaine</TableCell>
                   <TableCell>Bataillon</TableCell>
                   <TableCell>Compagnie 1</TableCell>
-                  <TableCell>Agent Polyvalent</TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>Jane</TableCell>
@@ -414,7 +423,6 @@ const PersonsPage = () => {
                   <TableCell>commandant</TableCell>
                   <TableCell>Regiment</TableCell>
                   <TableCell>Compagnie HQ</TableCell>
-                  <TableCell>Chef OPS</TableCell>
                 </TableRow>
               </TableBody>
             </Table>

@@ -32,8 +32,18 @@ SECRET_KEY = '@m0i*jxl3n8f2&qs+3=pbeks1wlc50jvciy%0-ms$@*nj&lojh'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost','192.214.54.88','192.214.54.89']
 
+# CORS Configuration
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://192.214.54.89:5173", # Secondary PC running the frontend
+    "http://192.214.54.88:5173", # Main PC (if running frontend there too)
+    "http://bfopshr:5173",       # Your custom local DNS alias
+]
+
+CORS_ALLOW_CREDENTIALS = True # Required for your CookieJWTAuthentication to work across IPs
 
 # Application definition
 
@@ -44,6 +54,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -52,6 +63,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',

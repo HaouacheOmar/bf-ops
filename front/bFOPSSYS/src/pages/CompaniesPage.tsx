@@ -137,10 +137,9 @@ const CompaniesPage = () => {
           <tbody>
             {safeCompanies.map(company => (
               <tr key={company.id}>
-                <td>{company.name}</td>
-                <td>{company.code}</td>
-                {/* Add this line to output the services count from your API directly: */}
-                <td>{company.services_count || 0} Jobs</td> 
+                <td><strong>{company.name}</strong></td>
+                <td><span className="status-pill permanent">{company.code}</span></td>
+                <td>{company.services_count || 0}</td>
                 <td>{new Date(company.created_at).toLocaleDateString()}</td>
                 <td>
                   <div className="action-icons">
