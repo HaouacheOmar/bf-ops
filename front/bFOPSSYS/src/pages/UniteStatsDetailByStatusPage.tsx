@@ -26,6 +26,11 @@ const UniteStatsDetailByStatusPage: React.FC = () => {
   const { status } = useParams<{ status: string }>();
   const [uniteStats, setUniteStats] = useState<UniteStat[]>([]);
   const [loading, setLoading] = useState(true);
+  const [yearId, setYearId] = useState<string>(() => sessionStorage.getItem('unite_status_year') || '');
+
+  useEffect(() => {
+    sessionStorage.setItem('unite_status_year', yearId);
+  }, [yearId]);
 
   useEffect(() => {
     if (!status) {
@@ -33,24 +38,42 @@ const UniteStatsDetailByStatusPage: React.FC = () => {
       return;
     }
 
-    axios.get('/api/stats/unites/')
+    setLoading(true);
+    const params = yearId ? { year_id: yearId } : {};
+
+    axios.get('/api/stats/unites/', { params })
       .then(res => {
         // Filter unites by status
         const filtered = res.data.filter((u: UniteStat) => u.status === status);
         setUniteStats(filtered);
       })
       .finally(() => setLoading(false));
-  }, [status]);
-
-  if (loading) return <div>{t('Loading...')}</div>;
+  }, [status, yearId]);
 
   return (
     <Box sx={{ width: '100%', p: { xs: 2, md: 3 } }}>
-      <Typography variant="h4" gutterBottom>
-        {t('Unites with status:')} {t(status || '')}
-      </Typography>
-      {uniteStats.length === 0 && <Typography>{t('No unites found for this status.')}</Typography>}
-      {uniteStats.map(unite => (
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" gutterBottom>
+          {t('Unites with status:')} {t(status || '')}
+        </Typography>
+        <Box>
+          <input
+            type="number"
+            className="filter-select"
+            style={{ width: '150px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+            placeholder={t('Year (e.g. 2026)')}
+            value={yearId}
+            onChange={(e) => setYearId(e.target.value)}
+          />
+        </Box>
+      </Box>
+
+      {loading ? (
+        <Typography>{t('Loading...')}</Typography>
+      ) : (
+        <>
+          {uniteStats.length === 0 && <Typography>{t('No unites found for this status.')}</Typography>}
+          {uniteStats.map(unite => (
         <Paper key={unite.unite_id} sx={{ p: 3, mt: 4, mb: 4 }}>
           <Typography variant="h5" gutterBottom>
             {unite.unite_name}

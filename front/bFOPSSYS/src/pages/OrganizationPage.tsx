@@ -14,7 +14,7 @@ import { api } from '../api';
 import { useI18n } from '../i18n/translator';
 import '../styles/layout.css';
 
-const tabOrder = ['companies', 'unites', 'grades', 'years', 'quotas'] as const;
+const tabOrder = ['companies', 'unites', 'grades', 'quotas'] as const;
 type TabKey = (typeof tabOrder)[number];
 
 const normalizeList = (data: any) => (Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : []);
@@ -508,91 +508,6 @@ const GradesPanel = () => {
   );
 };
 
-const YearsPanel = () => {
-  const { t } = useI18n();
-  const [years, setYears] = useState<any[]>([]);
-  const [filter, setFilter] = useState('');
-  const readOnlyNotice = t('Fiscal years are now generated automatically from assignments and quotas.');
-
-  const fetchYears = async () => {
-    const params = filter ? { search: filter } : undefined;
-    const res = await api.get('/years/', { params });
-    setYears(normalizeList(res.data));
-  };
-
-  useEffect(() => {
-    void fetchYears();
-  }, [filter]);
-
-  return (
-    <>
-      <div className="top-grid">
-        <div className="card">
-          <h2 className="card-title">{t('Fiscal Years')}</h2>
-          <p className="card-subtitle">{readOnlyNotice}</p>
-          <button className="btn btn-primary" style={{ width: '100%' }} disabled>
-            <CalendarTodayIcon fontSize="small" /> {t('Read-only')}
-          </button>
-        </div>
-        <div className="card">
-          <div className="card-title">
-            <span>{t('FISCAL YEAR FILTERS')}</span>
-            <button className="text-btn" onClick={() => setFilter('')}>{t('RESET ALL')}</button>
-          </div>
-          <div className="filters-row">
-            <div className="filter-group" style={{ position: 'relative' }}>
-              <label className="filter-label">{t('Search Years')}</label>
-              <SearchIcon style={{ position: 'absolute', left: '12px', top: '36px', color: '#9ca3af', fontSize: '18px' }} />
-              <input
-                type="text"
-                className="filter-select"
-                style={{ paddingLeft: '36px' }}
-                placeholder={t('Search years...')}
-                value={filter}
-                onChange={e => setFilter(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="table-header-row">
-          <div>
-            <h2 className="card-title" style={{ marginBottom: '4px' }}>{t('Year Registries')}</h2>
-            <p className="card-subtitle" style={{ margin: 0 }}>{years.length} {t('total years')}</p>
-          </div>
-        </div>
-
-        <table className="custom-table">
-          <thead>
-            <tr>
-              <th>{t('Year')}</th>
-              <th>{t('Total Quota')}</th>
-              <th>{t('Status')}</th>
-              <th>{t('Created At')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {years.map(year => (
-              <tr key={year.id}>
-                <td><strong>{year.year}</strong></td>
-                <td>{year.total_quota ?? '-'}</td>
-                <td>
-                  <span className={`status-pill ${year.is_closed ? 'intern' : 'permanent'}`}>
-                    {year.is_closed ? t('Closed') : t('Active')}
-                  </span>
-                </td>
-                <td>{year.created_at ? new Date(year.created_at).toLocaleDateString() : '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-};
-
 const QuotasPanel = () => {
   const { t } = useI18n();
   const [quotas, setQuotas] = useState<any[]>([]);
@@ -708,7 +623,7 @@ const QuotasPanel = () => {
           <tbody>
             {quotas.map(q => (
               <tr key={q.id}>
-                <td><strong>{years.find(y => y.id === q.year)?.year || q.year}</strong></td>
+                <td><strong>{q.year}</strong></td>
                 <td>{q.unite_name}</td>
                 <td><span className="status-pill permanent">{q.quota}</span></td>
                 <td>
@@ -730,10 +645,14 @@ const QuotasPanel = () => {
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label>{t('Fiscal Year')}</label>
-                <select value={form.year} onChange={e => setForm(current => ({ ...current, year: e.target.value }))} required>
-                  <option value="" disabled>{t('Select Year...')}</option>
-                  {years.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
-                </select>
+                <input 
+                  type="number" 
+                  className="filter-select" 
+                  value={form.year} 
+                  onChange={e => setForm(current => ({ ...current, year: e.target.value }))} 
+                  placeholder={t('e.g. 2028')} 
+                  required 
+                />
               </div>
               <div className="form-group">
                 <label>{t('Unite')}</label>
@@ -773,7 +692,7 @@ const OrganizationPage: React.FC = () => {
       <header className="page-header">
         <div className="page-title">
           <h1>{t('Organization Setup')}</h1>
-          <span className="breadcrumb">{t('Settings')} &gt; <span className="breadcrumb-active">{t('Companies, Unites, Grades, Years & Quotas')}</span></span>
+          <span className="breadcrumb">{t('Settings')} &gt; <span className="breadcrumb-active">{t('Companies, Unites, Grades & Quotas')}</span></span>
         </div>
       </header>
 
@@ -790,7 +709,6 @@ const OrganizationPage: React.FC = () => {
           <Tab value="companies" label={t('Companies')} />
           <Tab value="unites" label={t('Unites')} />
           <Tab value="grades" label={t('Grades')} />
-          <Tab value="years" label={t('Years')} />
           <Tab value="quotas" label={t('Quotas')} />
         </Tabs>
       </div>
@@ -805,10 +723,6 @@ const OrganizationPage: React.FC = () => {
 
       <TabPanel value="grades" activeTab={activeTab}>
         <GradesPanel />
-      </TabPanel>
-
-      <TabPanel value="years" activeTab={activeTab}>
-        <YearsPanel />
       </TabPanel>
 
       <TabPanel value="quotas" activeTab={activeTab}>

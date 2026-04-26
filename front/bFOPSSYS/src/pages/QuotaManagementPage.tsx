@@ -157,10 +157,14 @@ const QuotaManagementPage: React.FC = () => {
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label>{t('Fiscal Year')}</label>
-                <select value={form.year} onChange={e => setForm({ ...form, year: e.target.value })} required>
-                  <option value="" disabled>{t('Select Year...')}</option>
-                  {years.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
-                </select>
+                <input 
+                  type="number" 
+                  className="filter-select" 
+                  value={form.year} 
+                  onChange={e => setForm({ ...form, year: e.target.value })} 
+                  placeholder={t('e.g. 2028')} 
+                  required 
+                />
               </div>
               <div className="form-group">
                 <label>{t('Unite')}</label>

@@ -19,6 +19,7 @@ const DashboardPage = () => {
   const [unite, setUnite] = useState<string>(() => sessionStorage.getItem('dashboard_unite') || '');
   const [company, setCompany] = useState<string>(() => sessionStorage.getItem('dashboard_company') || '');
   const [selectedJob, setSelectedJob] = useState<string>(() => sessionStorage.getItem('dashboard_selectedJob') || 'all');
+  const [yearId, setYearId] = useState<string>(() => sessionStorage.getItem('dashboard_yearId') || '');
 
   const [unites, setUnites] = useState<Unite[]>([]);
   const [allCompanies, setAllCompanies] = useState<any[]>([]);
@@ -32,7 +33,8 @@ const DashboardPage = () => {
     sessionStorage.setItem('dashboard_unite', unite);
     sessionStorage.setItem('dashboard_company', company);
     sessionStorage.setItem('dashboard_selectedJob', selectedJob);
-  }, [unite, company, selectedJob]);
+    sessionStorage.setItem('dashboard_yearId', yearId);
+  }, [unite, company, selectedJob, yearId]);
 
   useEffect(() => {
     axios.get('/api/unites/').then(res => setUnites(res.data.results || res.data));
@@ -42,13 +44,19 @@ const DashboardPage = () => {
 
   useEffect(() => {
     const params: any = {};
+    if (yearId) params.year_id = yearId;
     if (unite) params.unite_id = unite;
     if (company) params.company_id = company;
     if (selectedJob !== 'all') params.job_id = selectedJob;
 
+    // Fetch Job Stats
     axios.get('/api/stats/jobs/', { params }).then(res => setJobStats(res.data.results || res.data));
-    axios.get('/api/stats/companies/', { params }).then(res => setCompanyStats(res.data.results || res.data));
-  }, [unite, company, selectedJob]);
+    
+    // Fetch Company Stats (ignoring job filters)
+    const companyParams: any = { ...params };
+    delete companyParams.job_id;
+    axios.get('/api/stats/companies/', { params: companyParams }).then(res => setCompanyStats(res.data.results || res.data));
+  }, [unite, company, selectedJob, yearId]);
 
   const filteredCompanies = unite 
     ? allCompanies.filter((c: any) => String(c.unite) === String(unite)) 
@@ -239,6 +247,14 @@ const DashboardPage = () => {
       
       {/* FILTERS */}
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 4 }}>
+        <input
+          type="number"
+          style={{ width: '150px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+          placeholder={t('Year (e.g. 2026)')}
+          value={yearId}
+          onChange={(e) => setYearId(e.target.value)}
+        />
+        
         <FormControl sx={{ minWidth: 200 }}>
           <InputLabel>{t('Unite')}</InputLabel>
           <Select 
