@@ -20,8 +20,6 @@ interface Assignment {
   job_name: string;
   company_name: string;
   unite_name?: string;
-  year: number;
-  year_value: number;
   contract_type: string;
   created_at: string;
 }
@@ -31,19 +29,17 @@ const AssignmentsPage = () => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [persons, setPersons] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
-  const [years, setYears] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
   const [allJobs, setAllJobs] = useState<any[]>([]);
   const [filter, setFilter] = useState('');
   
   const [personFilter, setPersonFilter] = useState('');
   const [jobFilter, setJobFilter] = useState('');
-  const [yearFilter, setYearFilter] = useState('');
   const [contractTypeFilter, setContractTypeFilter] = useState('');
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<Assignment | null>(null);
-  const [form, setForm] = useState({ person: '', job: '', year: '' });
+  const [form, setForm] = useState({ person: '', job: '' });
   
   const [gradePopup, setGradePopup] = useState(false);
   const [gradePopupMsg, setGradePopupMsg] = useState('');
@@ -66,7 +62,6 @@ const AssignmentsPage = () => {
     if (filter) params.search = filter;
     if (personFilter) params.person = personFilter;
     if (jobFilter) params.job = jobFilter;
-    if (yearFilter) params.year = yearFilter;
     if (contractTypeFilter) params.person__contract_type = contractTypeFilter;
     
     const res = await axios.get('/api/assignments/', { params });
@@ -77,19 +72,16 @@ const AssignmentsPage = () => {
     setFilter('');
     setPersonFilter('');
     setJobFilter('');
-    setYearFilter('');
     setContractTypeFilter('');
   };
 
   const fetchOptions = async () => {
-    const [p, y, j, c] = await Promise.all([
+    const [p, j, c] = await Promise.all([
       axios.get('/api/persons/'),
-      axios.get('/api/years/'),
       axios.get('/api/jobs/'),
       axios.get('/api/companies/'),
     ]);
     setPersons(p.data.results || p.data); 
-    setYears(y.data.results || y.data);
     setAllJobs(j.data.results || j.data);
     setCompanies(c.data.results || c.data);
   };
@@ -104,7 +96,7 @@ const AssignmentsPage = () => {
     setJobs(res.data.results || res.data);
   };
 
-  useEffect(() => { fetchAssignments(); }, [filter, personFilter, jobFilter, yearFilter, contractTypeFilter]);
+  useEffect(() => { fetchAssignments(); }, [filter, personFilter, jobFilter, contractTypeFilter]);
   useEffect(() => { fetchOptions(); }, []);
   useEffect(() => {
     fetchJobsForPersonCompany(selectedPerson?.company);
@@ -112,7 +104,7 @@ const AssignmentsPage = () => {
 
   const openNewForm = () => {
     setEditing(null);
-    setForm({ person: '', job: '', year: '' });
+    setForm({ person: '', job: '' });
     setIsFormOpen(true);
   };
 
@@ -138,7 +130,6 @@ const AssignmentsPage = () => {
       const payload = {
         person: form.person,
         job: form.job,
-        year: form.year,
       };
 
       if (editing) {
@@ -158,8 +149,7 @@ const AssignmentsPage = () => {
     setEditing(a);
     setForm({ 
       person: String(a.person), 
-      job: String(a.job), 
-      year: String(a.year)
+      job: String(a.job),
     });
     setIsFormOpen(true);
   };
@@ -196,7 +186,6 @@ const AssignmentsPage = () => {
       'Employee ID': `EMP-${a.person}`,
       'Company / Client': a.company_name,
       'Job Title': a.job_name,
-      'Fiscal Year': a.year_value,
       'Contract Type': formatContractType(a.contract_type),
       'Status': a.contract_type === 'permanent' ? t('Active') : a.contract_type === 'temporary' ? t('Pending Review') : t('On Hold'),
       'Created Date': new Date(a.created_at).toLocaleDateString(),
@@ -211,7 +200,6 @@ const AssignmentsPage = () => {
       { wch: 15 }, 
       { wch: 20 }, 
       { wch: 20 }, 
-      { wch: 15 }, 
       { wch: 15 }, 
       { wch: 18 }, 
       { wch: 15 }, 
@@ -234,7 +222,7 @@ const AssignmentsPage = () => {
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
-      const requiredColumns = ['first_name', 'last_name', 'matricule', 'job title', 'company', 'unite', 'year'];
+      const requiredColumns = ['first_name', 'last_name', 'matricule', 'job title', 'company', 'unite'];
       if (rows.length > 0) {
         const presentColumns = Object.keys(rows[0]).map((key) => normalizeText(key));
         const missingColumns = requiredColumns.filter((col) => !presentColumns.includes(col));
@@ -250,12 +238,6 @@ const AssignmentsPage = () => {
         if (key) personByMatricule.set(key, person);
       });
 
-      const yearByValue = new Map<string, any>();
-      years.forEach((year) => {
-        yearByValue.set(String(year.year).trim(), year);
-        yearByValue.set(String(year.id).trim(), year);
-      });
-
       const jobsByName = new Map<string, any[]>();
       allJobs.forEach((job) => {
         const key = normalizeText(job.name);
@@ -266,8 +248,7 @@ const AssignmentsPage = () => {
 
       const missingPersons: string[] = [];
       const missingJobs: string[] = [];
-      const invalidYears: string[] = [];
-      const payloads: Array<{ person: number; job: number; year: number }> = [];
+      const payloads: Array<{ person: number; job: number }> = [];
 
       rows.forEach((row, index) => {
         const rowNum = index + 2;
@@ -276,7 +257,6 @@ const AssignmentsPage = () => {
         const jobTitle = row['job title'] || row['Job Title'] || row.job_title || row.JobTitle;
         const companyName = row.company || row.Company;
         const uniteName = row.unite || row.Unite;
-        const yearValue = row.year || row.Year;
 
         const person = personByMatricule.get(normalizeText(matricule));
         if (!person) {
@@ -304,24 +284,16 @@ const AssignmentsPage = () => {
           return;
         }
 
-        const year = yearByValue.get(String(yearValue).trim());
-        if (!year) {
-          invalidYears.push(`Row ${rowNum} (${yearValue || '-'})`);
-          return;
-        }
-
         payloads.push({
           person: Number(person.id),
           job: Number(selectedJob.id),
-          year: Number(year.id),
         });
       });
 
-      if (missingPersons.length || missingJobs.length || invalidYears.length) {
+      if (missingPersons.length || missingJobs.length) {
         const warningLines: string[] = [];
         if (missingPersons.length) warningLines.push(`${t('Missing person')}: ${missingPersons.join(', ')}`);
         if (missingJobs.length) warningLines.push(`${t('Missing job')}: ${missingJobs.join(', ')}`);
-        if (invalidYears.length) warningLines.push(`${t('Check the year assignment')}: ${invalidYears.join(', ')}`);
         openWarning(warningLines.join('\n'));
         return;
       }
@@ -434,19 +406,6 @@ const AssignmentsPage = () => {
               </select>
             </div>
             <div className="filter-group">
-              <label className="filter-label">{t('Year')}</label>
-              <select 
-                className="filter-select"
-                value={yearFilter}
-                onChange={e => setYearFilter(e.target.value)}
-              >
-                <option value="">{t('All Years')}</option>
-                {years.map(y => (
-                  <option key={y.id} value={y.id}>{y.year}</option>
-                ))}
-              </select>
-            </div>
-            <div className="filter-group">
               <label className="filter-label">{t('Contract Type')}</label>
               <select 
                 className="filter-select"
@@ -522,7 +481,7 @@ const AssignmentsPage = () => {
                 <td>{a.job_name}</td>
                 <td>
                   <div className="info-block">
-                    <h4>FY {a.year_value}</h4>
+                    <h4>{new Date(a.created_at).toLocaleDateString()}</h4>
                     <p>{formatContractType(a.contract_type)} {t('terms')}</p>
                   </div>
                 </td>
@@ -566,13 +525,6 @@ const AssignmentsPage = () => {
                     {selectedPerson ? (jobs.length === 0 ? t('No jobs for this company') : t('Select Job...')) : t('Select a person first')}
                   </option>
                   {jobs.map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>{t('Fiscal Year')}</label>
-                <select value={form.year} onChange={e => setForm(f => ({ ...f, year: e.target.value }))} required>
-                  <option value="" disabled>{t('Select Year...')}</option>
-                  {years.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
                 </select>
               </div>
               <div className="modal-actions">

@@ -70,21 +70,8 @@ class Job(models.Model):
         return self.name
 
 
-class Year(models.Model):
-    year = models.PositiveIntegerField(unique=True)
-    total_quota = models.PositiveIntegerField()
-    is_closed = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["-year"]
-
-    def __str__(self):
-        return str(self.year)
-
-
 class UniteQuota(models.Model):
-    year = models.ForeignKey(Year, on_delete=models.CASCADE, related_name="unite_quotas")
+    year = models.PositiveIntegerField(db_index=True, db_column="year_id")
     unite = models.ForeignKey(Unite, on_delete=models.CASCADE, related_name="unite_quotas")
     quota = models.PositiveIntegerField()
 
@@ -93,7 +80,7 @@ class UniteQuota(models.Model):
         ordering = ["year", "unite"]
 
     def __str__(self):
-        return f"{self.year.year} - {self.unite.name}: {self.quota}"
+        return f"{self.year} - {self.unite.name}: {self.quota}"
 
 
 class Person(models.Model):
@@ -164,11 +151,7 @@ class Assignment(models.Model):
         on_delete=models.CASCADE,
         related_name="assignments"
     )
-    year = models.ForeignKey(
-        Year,
-        on_delete=models.CASCADE,
-        related_name="assignments"
-    )
+    year = models.PositiveIntegerField(db_index=True, db_column="year_id", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -178,7 +161,7 @@ class Assignment(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.person} - {self.job} - {self.year}"
+        return f"{self.person} - {self.job} - {self.year if self.year is not None else 'No FY'}"
 
 
 class TransferHistory(models.Model):
@@ -214,7 +197,7 @@ class TransferHistory(models.Model):
 
 class Gain(models.Model):
     person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="gains")
-    year = models.ForeignKey(Year, on_delete=models.CASCADE, related_name="gains")
+    year = models.PositiveIntegerField(db_index=True, db_column="year_id", null=True, blank=True)
     unite = models.ForeignKey(Unite, on_delete=models.SET_NULL, null=True, blank=True, related_name="gains")
     company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name="gains")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -227,7 +210,7 @@ class Gain(models.Model):
 
 class Loss(models.Model):
     person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name="losses")
-    year = models.ForeignKey(Year, on_delete=models.CASCADE, related_name="losses")
+    year = models.PositiveIntegerField(db_index=True, db_column="year_id", null=True, blank=True)
     unite = models.ForeignKey(Unite, on_delete=models.SET_NULL, null=True, blank=True, related_name="losses")
     company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name="losses")
     created_at = models.DateTimeField(auto_now_add=True)

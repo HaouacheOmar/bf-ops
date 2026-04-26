@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+from django.db.models import Q
 from ..models import Assignment, Job
 
 
@@ -9,7 +10,7 @@ def _person_matches_destination_job(person_grade_id, accepted_grade_ids):
     return person_grade_id is None
 
 
-def build_transfer_suggestions(year_id, transfer_kind="all", limit=100):
+def build_transfer_suggestions(year, transfer_kind="all", limit=100):
     """
     - source job must have surplus workers
     - source company must have surplus workers
@@ -33,12 +34,26 @@ def build_transfer_suggestions(year_id, transfer_kind="all", limit=100):
     if not jobs:
         return []
 
-    assignments = list(
-        Assignment.objects
-        .filter(year_id=year_id)
-        .select_related("person__grade", "job__company__unite")
-        .order_by("job_id", "person__last_name", "person__first_name")
-    )
+    assignment_qs = Assignment.objects.select_related("person__grade", "job__company__unite")
+    if year is not None:
+        try:
+            year_val = int(year)
+            assignment_qs = assignment_qs.filter(Q(year__lte=year_val) | Q(year__isnull=True))
+        except (ValueError, TypeError):
+            pass
+
+    assignment_qs = assignment_qs.order_by("person_id", "-created_at", "-id")
+
+    latest_assignments = []
+    seen_persons = set()
+    for assignment in assignment_qs:
+        if assignment.person_id not in seen_persons:
+            seen_persons.add(assignment.person_id)
+            latest_assignments.append(assignment)
+
+    latest_assignments.sort(key=lambda a: (a.job_id, a.person.last_name, a.person.first_name))
+    assignments = latest_assignments
+
     if not assignments:
         return []
 
@@ -169,7 +184,8 @@ def build_transfer_suggestions(year_id, transfer_kind="all", limit=100):
                 "person_name": str(assignment.person),
                 "person_grade_id": assignment.person.grade_id,
                 "person_grade_name": assignment.person.grade.name if assignment.person.grade else None,
-                "year_id": assignment.year_id,
+                "year_id": assignment.year,
+                "year": assignment.year,
                 "transfer_type": best_transfer_type,
                 "requires_validation": True,
                 "source": {

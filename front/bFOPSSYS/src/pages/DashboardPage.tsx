@@ -10,19 +10,16 @@ import { useI18n } from '../i18n/translator';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, ChartDataLabels);
 
-interface Year { id: number; year: number; }
 interface Unite { id: number; name: string; }
 
 const DashboardPage = () => {
   const navigate = useNavigate();
   const { t } = useI18n();
 
-  const [year, setYear] = useState<string>(() => sessionStorage.getItem('dashboard_year') || '');
   const [unite, setUnite] = useState<string>(() => sessionStorage.getItem('dashboard_unite') || '');
   const [company, setCompany] = useState<string>(() => sessionStorage.getItem('dashboard_company') || '');
   const [selectedJob, setSelectedJob] = useState<string>(() => sessionStorage.getItem('dashboard_selectedJob') || 'all');
 
-  const [years, setYears] = useState<Year[]>([]);
   const [unites, setUnites] = useState<Unite[]>([]);
   const [allCompanies, setAllCompanies] = useState<any[]>([]);
   const [allJobs, setAllJobs] = useState<any[]>([]);
@@ -32,46 +29,26 @@ const DashboardPage = () => {
 
   // Persist filters to session storage when they change
   useEffect(() => {
-    sessionStorage.setItem('dashboard_year', year);
     sessionStorage.setItem('dashboard_unite', unite);
     sessionStorage.setItem('dashboard_company', company);
     sessionStorage.setItem('dashboard_selectedJob', selectedJob);
-  }, [year, unite, company, selectedJob]);
+  }, [unite, company, selectedJob]);
 
   useEffect(() => {
-    axios.get('/api/years/').then(res => {
-      const fetchedYears = res.data.results || res.data;
-      setYears(fetchedYears);
-      
-      // Auto-select current year if none is selected
-      const savedYear = sessionStorage.getItem('dashboard_year');
-      if (!savedYear) {
-        const currentYearValue = new Date().getFullYear();
-        const found = fetchedYears.find((y: Year) => y.year === currentYearValue);
-        if (found) {
-          setYear(String(found.id));
-        }
-      }
-    });
     axios.get('/api/unites/').then(res => setUnites(res.data.results || res.data));
     axios.get('/api/companies/').then(res => setAllCompanies(res.data.results || res.data));
     axios.get('/api/jobs/').then(res => setAllJobs(res.data.results || res.data));
   }, []);
 
   useEffect(() => {
-    if (year) {
-      const params: any = { year_id: year };
-      if (unite) params.unite_id = unite;
-      if (company) params.company_id = company;
-      if (selectedJob !== 'all') params.job_id = selectedJob;
-      
-      axios.get('/api/stats/jobs/', { params }).then(res => setJobStats(res.data.results || res.data));
-      axios.get('/api/stats/companies/', { params }).then(res => setCompanyStats(res.data.results || res.data));
-    } else {
-      setJobStats([]);
-      setCompanyStats([]);
-    }
-  }, [year, unite, company, selectedJob]);
+    const params: any = {};
+    if (unite) params.unite_id = unite;
+    if (company) params.company_id = company;
+    if (selectedJob !== 'all') params.job_id = selectedJob;
+
+    axios.get('/api/stats/jobs/', { params }).then(res => setJobStats(res.data.results || res.data));
+    axios.get('/api/stats/companies/', { params }).then(res => setCompanyStats(res.data.results || res.data));
+  }, [unite, company, selectedJob]);
 
   const filteredCompanies = unite 
     ? allCompanies.filter((c: any) => String(c.unite) === String(unite)) 
@@ -140,13 +117,13 @@ const DashboardPage = () => {
     const idx = elements[0].index;
     const status = ['deficit', 'balanced', 'surplus'][idx];
     
-    if (year && filteredJobStats.length > 0) {
+    if (filteredJobStats.length > 0) {
       let query = '?';
       if (unite) query += `unite=${unite}&`;
       if (company) query += `company=${company}`;
       
       const queryString = query !== '?' ? query.replace(/&$/, '') : '';
-      navigate(`/unite-stats-detail-by-status/${status}/${year}${queryString}`);
+      navigate(`/unite-stats-detail-by-status/${status}${queryString}`);
     }
   };
 
@@ -263,15 +240,6 @@ const DashboardPage = () => {
       {/* FILTERS */}
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 4 }}>
         <FormControl sx={{ minWidth: 200 }}>
-          <InputLabel>{t('Year')}</InputLabel>
-          <Select value={year} label={t('Year')} onChange={e => setYear(e.target.value)}>
-            {years.map(y => (
-              <MenuItem key={y.id} value={y.id}>{y.year}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        <FormControl sx={{ minWidth: 200 }}>
           <InputLabel>{t('Unite')}</InputLabel>
           <Select 
             value={unite} 
@@ -323,52 +291,48 @@ const DashboardPage = () => {
         </FormControl>
       </Box>
 
-      {year && (
-        <>
-          {/* JOB CHARTS */}
-          <Grid container spacing={3}>
-            <Grid size={{ xs: 12, md: 7 }}>
-              <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%' }}>
-                <Typography variant="h6" fontWeight="medium" mb={3}>{t('Job Capacity vs. Actual')}</Typography>
-                <Bar data={jobBarData} options={{ responsive: true, plugins: { legend: { position: 'top' } } }} />
-              </Paper>
-            </Grid>
-            
-            <Grid size={{ xs: 12, md: 5 }}>
-              <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <Typography variant="h6" fontWeight="medium" mb={3}>Job Status Breakdown</Typography>
-                <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                  <Pie data={jobStatusPieData} options={jobStatusPieOptions} />
-                </Box>
-              </Paper>
-            </Grid>
+      {/* JOB CHARTS */}
+      <Grid container spacing={3}>
+        <Grid size={{ xs: 12, md: 7 }}>
+          <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%' }}>
+            <Typography variant="h6" fontWeight="medium" mb={3}>{t('Job Capacity vs. Actual')}</Typography>
+            <Bar data={jobBarData} options={{ responsive: true, plugins: { legend: { position: 'top' } } }} />
+          </Paper>
+        </Grid>
+        
+        <Grid size={{ xs: 12, md: 5 }}>
+          <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Typography variant="h6" fontWeight="medium" mb={3}>Job Status Breakdown</Typography>
+            <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <Pie data={jobStatusPieData} options={jobStatusPieOptions} />
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* COMPANY CHARTS */}
+      {companyStats.length > 0 && (
+        <Grid container spacing={3} sx={{ mt: 2 }}>
+          <Grid size={{ xs: 12, md: 7 }}>
+            <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%' }}>
+              <Typography variant="h6" fontWeight="medium" mb={3}>
+                {t('Company Capacity vs. Actual')}
+              </Typography>
+              <Bar data={companyBarData} options={{ responsive: true, plugins: { legend: { position: 'top' } } }} />
+            </Paper>
           </Grid>
 
-          {/* COMPANY CHARTS */}
-          {companyStats.length > 0 && (
-            <Grid container spacing={3} sx={{ mt: 2 }}>
-              <Grid size={{ xs: 12, md: 7 }}>
-                <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%' }}>
-                  <Typography variant="h6" fontWeight="medium" mb={3}>
-                    {t('Company Capacity vs. Actual')}
-                  </Typography>
-                  <Bar data={companyBarData} options={{ responsive: true, plugins: { legend: { position: 'top' } } }} />
-                </Paper>
-              </Grid>
-
-              <Grid size={{ xs: 12, md: 5 }}>
-                <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                  <Typography variant="h6" fontWeight="medium" mb={3}>
-                    Company Status Breakdown
-                  </Typography>
-                  <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                    <Pie data={companyStatusPieData} options={companyStatusPieOptions} />
-                  </Box>
-                </Paper>
-              </Grid>
-            </Grid>
-          )}
-        </>
+          <Grid size={{ xs: 12, md: 5 }}>
+            <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Typography variant="h6" fontWeight="medium" mb={3}>
+                Company Status Breakdown
+              </Typography>
+              <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <Pie data={companyStatusPieData} options={companyStatusPieOptions} />
+              </Box>
+            </Paper>
+          </Grid>
+        </Grid>
       )}
     </Box>
   );

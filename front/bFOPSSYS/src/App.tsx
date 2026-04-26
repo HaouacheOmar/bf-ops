@@ -11,13 +11,11 @@ import './App.css';
 
 // --- Icons ---
 import GridViewIcon from '@mui/icons-material/GridView';
-import BusinessIcon from '@mui/icons-material/Business';
 import WorkOutlineIcon from '@mui/icons-material/WorkOutline';
 import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -337,7 +335,7 @@ function App() {
               <Route path="quota-management" element={<ProtectedRoute requireAdmin><Navigate to="/organization?tab=quotas" replace /></ProtectedRoute>} />
               <Route path="users" element={<ProtectedRoute requireAdmin><UsersManagementPage /></ProtectedRoute>} />
               <Route path="unite-stats/:uniteId/:yearId" element={<ProtectedRoute requireAdmin><UniteStatsDetailPageWrapper /></ProtectedRoute>} />
-              <Route path="unite-stats-detail-by-status/:status/:year" element={<ProtectedRoute requireAdmin><UniteStatsDetailByStatusPage /></ProtectedRoute>} />
+              <Route path="unite-stats-detail-by-status/:status" element={<ProtectedRoute requireAdmin><UniteStatsDetailByStatusPage /></ProtectedRoute>} />
               <Route path="transfer" element={<ProtectedRoute requireAdmin><TransferPage /></ProtectedRoute>} />
               <Route path="gain-loss" element={<ProtectedRoute requireAdmin><GainLossPage /></ProtectedRoute>} />
             </Route>

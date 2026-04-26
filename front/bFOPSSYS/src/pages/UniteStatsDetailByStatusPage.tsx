@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Typography, Paper, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip } from '@mui/material';
+import { Typography, Paper, Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import axios from 'axios';
 import { useI18n } from '../i18n/translator';
 
@@ -23,20 +23,24 @@ interface UniteStat {
 
 const UniteStatsDetailByStatusPage: React.FC = () => {
   const { t } = useI18n();
-  const { status, year } = useParams<{ status: string; year: string }>();
+  const { status } = useParams<{ status: string }>();
   const [uniteStats, setUniteStats] = useState<UniteStat[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!year) return;
-    axios.get('/api/stats/unites/', { params: { year_id: year } })
+    if (!status) {
+      setLoading(false);
+      return;
+    }
+
+    axios.get('/api/stats/unites/')
       .then(res => {
         // Filter unites by status
         const filtered = res.data.filter((u: UniteStat) => u.status === status);
         setUniteStats(filtered);
       })
       .finally(() => setLoading(false));
-  }, [status, year]);
+  }, [status]);
 
   if (loading) return <div>{t('Loading...')}</div>;
 

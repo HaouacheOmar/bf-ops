@@ -10,7 +10,7 @@ export default defineConfig({
   ],
   server: {
     host: '0.0.0.0', // Allows the server to be accessed via local DNS aliases like BFopsHR
-    allowedHosts: ['bfopshr', 'BFopsHR', '192.214.54.89', '192.214.54.88'], // Explicitly allow the new custom host and IP
+    allowedHosts: ['bfopshr', 'BFopsHR', '192.214.54.89', '192.214.54.88','127.0.0.1'], // Explicitly allow the new custom host and IP
     proxy: {
       '/api': 'http://192.214.54.88:8000', // Redirect API calls to the PC hosting the Django server
     },

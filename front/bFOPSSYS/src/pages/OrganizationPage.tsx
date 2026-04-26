@@ -512,9 +512,7 @@ const YearsPanel = () => {
   const { t } = useI18n();
   const [years, setYears] = useState<any[]>([]);
   const [filter, setFilter] = useState('');
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editing, setEditing] = useState<any | null>(null);
-  const [form, setForm] = useState({ year: '', total_quota: '', is_closed: false });
+  const readOnlyNotice = t('Fiscal years are now generated automatically from assignments and quotas.');
 
   const fetchYears = async () => {
     const params = filter ? { search: filter } : undefined;
@@ -526,55 +524,14 @@ const YearsPanel = () => {
     void fetchYears();
   }, [filter]);
 
-  const openNewForm = () => {
-    setEditing(null);
-    setForm({ year: '', total_quota: '', is_closed: false });
-    setIsFormOpen(true);
-  };
-
-  const closeForm = () => {
-    setIsFormOpen(false);
-    setEditing(null);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (editing) {
-      await api.put(`/years/${editing.id}/`, form);
-    } else {
-      await api.post('/years/', form);
-    }
-
-    closeForm();
-    void fetchYears();
-  };
-
-  const handleEdit = (year: any) => {
-    setEditing(year);
-    setForm({
-      year: String(year.year),
-      total_quota: String(year.total_quota),
-      is_closed: year.is_closed,
-    });
-    setIsFormOpen(true);
-  };
-
-  const handleDelete = async (id: number) => {
-    if (window.confirm(t('Delete this fiscal year?'))) {
-      await api.delete(`/years/${id}/`);
-      void fetchYears();
-    }
-  };
-
   return (
     <>
       <div className="top-grid">
         <div className="card">
-          <h2 className="card-title">{t('New Fiscal Year')}</h2>
-          <p className="card-subtitle">{t('Initialize a new financial year and total quotas.')}</p>
-          <button className="btn btn-primary" style={{ width: '100%' }} onClick={openNewForm}>
-            <CalendarTodayIcon fontSize="small" /> {t('Add Year')}
+          <h2 className="card-title">{t('Fiscal Years')}</h2>
+          <p className="card-subtitle">{readOnlyNotice}</p>
+          <button className="btn btn-primary" style={{ width: '100%' }} disabled>
+            <CalendarTodayIcon fontSize="small" /> {t('Read-only')}
           </button>
         </div>
         <div className="card">
@@ -614,57 +571,24 @@ const YearsPanel = () => {
               <th>{t('Total Quota')}</th>
               <th>{t('Status')}</th>
               <th>{t('Created At')}</th>
-              <th>{t('Actions')}</th>
             </tr>
           </thead>
           <tbody>
             {years.map(year => (
               <tr key={year.id}>
                 <td><strong>{year.year}</strong></td>
-                <td>{year.total_quota}</td>
+                <td>{year.total_quota ?? '-'}</td>
                 <td>
                   <span className={`status-pill ${year.is_closed ? 'intern' : 'permanent'}`}>
                     {year.is_closed ? t('Closed') : t('Active')}
                   </span>
                 </td>
                 <td>{year.created_at ? new Date(year.created_at).toLocaleDateString() : '-'}</td>
-                <td>
-                  <div className="action-icons">
-                    <button className="action-btn edit" onClick={() => handleEdit(year)}><EditIcon fontSize="small" /></button>
-                    <button className="action-btn delete" onClick={() => handleDelete(year.id)}><DeleteIcon fontSize="small" /></button>
-                  </div>
-                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-
-      {isFormOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h2 style={{ marginTop: 0, marginBottom: '24px' }}>{editing ? t('Edit Year') : t('Add Year')}</h2>
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>{t('Fiscal Year')}</label>
-                <input type="number" className="filter-select" value={form.year} onChange={e => setForm(current => ({ ...current, year: e.target.value }))} required />
-              </div>
-              <div className="form-group">
-                <label>{t('Total Quota')}</label>
-                <input type="number" className="filter-select" value={form.total_quota} onChange={e => setForm(current => ({ ...current, total_quota: e.target.value }))} required />
-              </div>
-              <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '8px' }}>
-                <input type="checkbox" checked={form.is_closed} onChange={e => setForm(current => ({ ...current, is_closed: e.target.checked }))} id="closedCheck" />
-                <label htmlFor="closedCheck" style={{ margin: 0 }}>{t('Is Closed?')}</label>
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={closeForm}>{t('Cancel')}</button>
-                <button type="submit" className="btn btn-primary">{editing ? t('Update') : t('Save')}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </>
   );
 };

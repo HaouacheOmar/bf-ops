@@ -3,14 +3,14 @@ from django.db import IntegrityError
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from .models import Assignment, Company, Grade, Job, Person, Unite, Year
+from .models import Assignment, Company, Grade, Job, Person, Unite, UniteQuota
 
 
 class TransferSuggestionTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
 
-		self.year, _ = Year.objects.get_or_create(year=2026, defaults={"total_quota": 0})
+		self.year = 2026
 
 		self.grade_x = Grade.objects.create(name="Grade X", code="GX")
 		self.grade_y = Grade.objects.create(name="Grade Y", code="GY")
@@ -71,7 +71,7 @@ class TransferSuggestionTests(TestCase):
 			self.assignments.append(assignment)
 
 	def test_transfer_suggestions_include_internal_external_and_mark_paths(self):
-		response = self.client.get(f"/api/transfers-suggestions/?year_id={self.year.id}")
+		response = self.client.get(f"/api/transfers-suggestions/?year_id={self.year}")
 		self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 		payload = response.json()
@@ -99,10 +99,10 @@ class TransferSuggestionTests(TestCase):
 
 	def test_transfer_suggestions_support_internal_and_external_filters(self):
 		internal_response = self.client.get(
-			f"/api/transfers-suggestions/?year_id={self.year.id}&transfer_kind=internal"
+			f"/api/transfers-suggestions/?year_id={self.year}&transfer_kind=internal"
 		)
 		external_response = self.client.get(
-			f"/api/transfers-suggestions/?year_id={self.year.id}&transfer_kind=external"
+			f"/api/transfers-suggestions/?year_id={self.year}&transfer_kind=external"
 		)
 
 		self.assertEqual(internal_response.status_code, status.HTTP_200_OK)
@@ -177,8 +177,9 @@ class StatsAggregationTests(TestCase):
 	def setUp(self):
 		self.client = APIClient()
 
-		self.year, _ = Year.objects.get_or_create(year=2026, defaults={"total_quota": 0})
+		self.year = 2026
 		self.unite = Unite.objects.create(name="Regiment", code="REG")
+		UniteQuota.objects.create(year=self.year, unite=self.unite, quota=15)
 
 		self.commandement = Company.objects.create(
 			name="Commandement",
@@ -255,7 +256,7 @@ class StatsAggregationTests(TestCase):
 		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 	def test_company_stats_keep_capacity_per_company(self):
-		response = self.client.get(f"/api/stats/companies/?year_id={self.year.id}")
+		response = self.client.get(f"/api/stats/companies/?year_id={self.year}")
 		self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 		stats = response.json().get("results", [])
@@ -267,12 +268,12 @@ class StatsAggregationTests(TestCase):
 		self.assertEqual(stats_by_company["Mounawara"]["current_workers"], 10)
 
 	def test_unite_stats_sum_company_capacities(self):
-		response = self.client.get(f"/api/stats/unites/?year_id={self.year.id}")
+		response = self.client.get(f"/api/stats/unites/?year_id={self.year}")
 		self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 		stats = response.json()
 		regiment = next((row for row in stats if row["unite_id"] == self.unite.id), None)
 
 		self.assertIsNotNone(regiment)
-		self.assertEqual(regiment["max_workers"], 23)
+		self.assertEqual(regiment["max_workers"], 15)
 		self.assertEqual(regiment["current_workers"], 12)

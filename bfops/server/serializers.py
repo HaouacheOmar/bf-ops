@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Assignment, Company, Job, Person, Year, Grade, Unite, TransferHistory, UniteQuota, Gain, Loss
+from .models import Assignment, Company, Job, Person, Grade, Unite, TransferHistory, UniteQuota, Gain, Loss
 
 class UniteQuotaSerializer(serializers.ModelSerializer):
     unite_name = serializers.CharField(source="unite.name", read_only=True)
@@ -14,7 +14,7 @@ class TransferHistorySerializer(serializers.ModelSerializer):
     to_company_name = serializers.SerializerMethodField()
     person_name = serializers.CharField(source="assignment.person.__str__", read_only=True)
     job_name = serializers.CharField(source="assignment.job.name", read_only=True)
-    year_value = serializers.IntegerField(source="assignment.year.year", read_only=True)
+    year_value = serializers.IntegerField(source="assignment.year", read_only=True)
 
     class Meta:
         model = TransferHistory
@@ -122,19 +122,6 @@ class CompanySerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
-class YearSerializer(serializers.ModelSerializer):
-    unite_quotas = UniteQuotaSerializer(many=True, read_only=True)
-    class Meta:
-        model = Year
-        fields = [
-            "id",
-            "year",
-            "total_quota",
-            "is_closed",
-            "created_at",
-            "unite_quotas",
-        ]
-
 class PersonSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     unite_name = serializers.CharField(source="unite.name", read_only=True)
@@ -179,8 +166,8 @@ class PersonSerializer(serializers.ModelSerializer):
 
         return (
             obj.assignments
-            .select_related("job__company__unite", "year")
-            .order_by("-year__year", "-created_at")
+            .select_related("job__company__unite")
+            .order_by("-year", "-created_at")
             .first()
         )
 
@@ -223,7 +210,8 @@ class AssignmentSerializer(serializers.ModelSerializer):
         read_only=True,
         default="Aucune unité"
     )
-    year_value = serializers.IntegerField(source="year.year", read_only=True)
+    year_value = serializers.IntegerField(source="year", read_only=True)
+    year = serializers.IntegerField(write_only=True, required=False, allow_null=True)
 
     class Meta:
         model = Assignment
@@ -231,7 +219,6 @@ class AssignmentSerializer(serializers.ModelSerializer):
             "id",
             "person",
             "job",
-            "year",
             "person_name",
             "job_name",
             "company_id",
@@ -240,9 +227,16 @@ class AssignmentSerializer(serializers.ModelSerializer):
             "unite_name",
             "year_value",
             "created_at",
+            "year",
         ]
+        extra_kwargs = {
+            "year": {"required": False},
+        }
 
     def validate(self, data):
+        if data.get("year") in (None, ""):
+            data["year"] = self.instance.year if self.instance else None
+
         person = data.get('person')
         job = data.get('job')
         
@@ -268,7 +262,7 @@ class GainSerializer(serializers.ModelSerializer):
     person_name = serializers.CharField(source="person.__str__", read_only=True)
     unite_name = serializers.CharField(source="unite.name", read_only=True)
     company_name = serializers.CharField(source="company.name", read_only=True)
-    year_value = serializers.IntegerField(source="year.year", read_only=True)
+    year_value = serializers.IntegerField(source="year", read_only=True)
 
     class Meta:
         model = Gain
@@ -278,7 +272,7 @@ class LossSerializer(serializers.ModelSerializer):
     person_name = serializers.CharField(source="person.__str__", read_only=True)
     unite_name = serializers.CharField(source="unite.name", read_only=True)
     company_name = serializers.CharField(source="company.name", read_only=True)
-    year_value = serializers.IntegerField(source="year.year", read_only=True)
+    year_value = serializers.IntegerField(source="year", read_only=True)
 
     class Meta:
         model = Loss

@@ -1,15 +1,40 @@
-from django.db.models import Count
-from ..models import Assignment, Job
+from django.db.models import Count, Q
+from ..models import Assignment, Job, UniteQuota
 
-def job_statistics(year_id):
+
+def _assignment_counts_by_job(year=None):
+    assignment_qs = Assignment.objects.all()
+
+    if year is not None:
+        try:
+            year = int(year)
+            # Include assignments from this year or earlier, OR assignments with no explicit year
+            assignment_qs = assignment_qs.filter(Q(year__lte=year) | Q(year__isnull=True))
+        except (ValueError, TypeError):
+            pass
+
+    # Snapshot mode: keep only the latest assignment per person up to the given year.
+    latest_job_by_person = {}
+    latest_assignments = (
+        assignment_qs
+        .order_by("person_id", "-created_at", "-id")
+        .values_list("person_id", "job_id")
+    )
+    for person_id, job_id in latest_assignments:
+        if person_id not in latest_job_by_person:
+            latest_job_by_person[person_id] = job_id
+
+    job_counts = {}
+    for job_id in latest_job_by_person.values():
+        job_counts[job_id] = job_counts.get(job_id, 0) + 1
+
+    return job_counts
+
+
+def job_statistics(year=None):
 
     jobs = Job.objects.select_related("company__unite").exclude(name__iexact="En attente d'affectation")
-    job_counts = dict(
-        Assignment.objects
-        .filter(year_id=year_id)
-        .values_list("job_id")
-        .annotate(count=Count("id"))
-    )
+    job_counts = _assignment_counts_by_job(year)
     results = []
     for job in jobs:
         current = job_counts.get(job.id, 0)
@@ -35,18 +60,36 @@ def job_statistics(year_id):
         })
     return results
 
-def unite_statistics(year_id):
+def unite_statistics(year_id=None):
     """
-    Returns a list of unite stats for the given year, aggregating jobs in each unite.
+    Returns a list of unite stats for the given year, using UniteQuota as capacity.
     """
     jobs = Job.objects.select_related("company__unite").exclude(name__iexact="En attente d'affectation")
-    job_counts = dict(
-        Assignment.objects
-        .filter(year_id=year_id)
-        .values_list("job_id")
-        .annotate(count=Count("id"))
-    )
+    job_counts = _assignment_counts_by_job(year_id)
+
+    quota_qs = UniteQuota.objects.select_related("unite")
+    if year_id is not None:
+        quota_qs = quota_qs.filter(year=year_id)
+
+    quotas = {}
+    for quota in quota_qs.order_by("unite_id", "-year", "-id"):
+        if quota.unite_id in quotas:
+            continue
+        quotas[quota.unite_id] = {
+            "unite_name": quota.unite.name,
+            "quota": quota.quota,
+        }
+
     unite_map = {}
+    for unite_id, quota_info in quotas.items():
+        unite_map[unite_id] = {
+            "unite_id": unite_id,
+            "unite_name": quota_info["unite_name"],
+            "max_workers": quota_info["quota"],
+            "current_workers": 0,
+            "jobs": [],
+        }
+
     for job in jobs:
         unite_id = job.company.unite_id if job.company and job.company.unite_id else None
         if unite_id not in unite_map:
@@ -57,7 +100,6 @@ def unite_statistics(year_id):
                 "current_workers": 0,
                 "jobs": [],
             }
-        unite_map[unite_id]["max_workers"] += job.max_workers
         current_workers = job_counts.get(job.id, 0)
         unite_map[unite_id]["current_workers"] += current_workers
         difference = current_workers - job.max_workers
@@ -101,7 +143,7 @@ def unite_statistics(year_id):
         })
     return results
 
-def company_statistics(year_id):
+def company_statistics(year=None):
     """
     Returns a list of company stats for the given year, aggregating jobs in each company.
     """
@@ -124,12 +166,7 @@ def company_statistics(year_id):
             }
         company_map[company_id]["max_workers"] += job.max_workers
 
-    job_counts = dict(
-        Assignment.objects
-        .filter(year_id=year_id)
-        .values_list("job_id")
-        .annotate(count=Count("id"))
-    )
+    job_counts = _assignment_counts_by_job(year)
     
     for job in jobs:
         if job.company and job.company.id in company_map:

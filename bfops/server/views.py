@@ -8,53 +8,80 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 
-from .models import Assignment, Company, Job, Year, Person, Grade, Unite, Gain, Loss, TransferHistory, UniteQuota
+from .models import Assignment, Company, Job, Person, Grade, Unite, Gain, Loss, TransferHistory, UniteQuota
 from .serializers import (
-    AssignmentSerializer, CompanySerializer, JobSerializer, YearSerializer, 
+    AssignmentSerializer, CompanySerializer, JobSerializer,
     PersonSerializer, GradeSerializer, UniteSerializer, UniteQuotaSerializer,
     TransferHistorySerializer, GainSerializer, LossSerializer
 )
 from .services.stats import company_statistics, job_statistics, unite_statistics
 from .services.transfer_suggestions import build_transfer_suggestions
 
+
+def _get_requested_year(request, *, required=True):
+    raw_year = request.query_params.get("year_id") or request.query_params.get("year")
+    if not raw_year:
+        if required:
+            return None, Response(
+                {"error": "year_id (or year) parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return None, None
+
+    try:
+        year = int(raw_year)
+    except (TypeError, ValueError):
+        return None, Response(
+            {"error": "year_id (or year) must be an integer"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if year <= 0:
+        return None, Response(
+            {"error": "year must be a positive integer"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return year, None
+
 class JobStatsView(APIView):
     def get(self, request):
-        year_id = request.query_params.get('year_id')
-        if not year_id:
-            return Response({"error": "year_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        year, error_response = _get_requested_year(request, required=False)
+        if error_response is not None:
+            return error_response
         
-        cache_key = f"stats:jobs:{year_id}"
+        cache_key = f"stats:jobs:{year if year is not None else 'all'}"
         data = cache.get(cache_key)
         if data is None:
-            data = job_statistics(year_id)
+            data = job_statistics(year)
             cache.set(cache_key, data, timeout=3600)
             
         return Response(data)
 
 class UniteStatsView(APIView):
     def get(self, request):
-        year_id = request.query_params.get('year_id')
-        if not year_id:
-            return Response({"error": "year_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        year, error_response = _get_requested_year(request, required=False)
+        if error_response is not None:
+            return error_response
             
-        cache_key = f"stats:unites:{year_id}"
+        cache_key = f"stats:unites:{year if year is not None else 'all'}"
         data = cache.get(cache_key)
         if data is None:
-            data = unite_statistics(year_id)
+            data = unite_statistics(year)
             cache.set(cache_key, data, timeout=3600)
             
         return Response(data)
 
 @api_view(['GET'])
 def company_stats_view(request):
-    year_id = request.GET.get('year_id')
-    if not year_id:
-        return Response({"error": "year_id parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+    year, error_response = _get_requested_year(request, required=False)
+    if error_response is not None:
+        return error_response
     
-    cache_key = f"stats:companies:{year_id}"
+    cache_key = f"stats:companies:{year if year is not None else 'all'}"
     stats = cache.get(cache_key)
     if stats is None:
-        stats = company_statistics(year_id)
+        stats = company_statistics(year)
         cache.set(cache_key, stats, timeout=3600)
     
     unite_id = request.GET.get('unite_id')
@@ -68,7 +95,7 @@ def company_stats_view(request):
     return Response({"results": stats})
 
 class UniteQuotaViewSet(viewsets.ModelViewSet):
-    queryset = UniteQuota.objects.select_related("year", "unite").all()
+    queryset = UniteQuota.objects.select_related("unite").all()
     serializer_class = UniteQuotaSerializer
 
 class TransferHistoryViewSet(viewsets.ModelViewSet):
@@ -83,7 +110,7 @@ class TransferHistoryViewSet(viewsets.ModelViewSet):
     ordering_fields = ['transfer_date', 'from_unite', 'to_unite']
 
 class AssignmentViewSet(viewsets.ModelViewSet):
-    queryset = Assignment.objects.select_related("person", "job", "year").all()
+    queryset = Assignment.objects.select_related("person", "job", "job__company__unite").all()
     serializer_class = AssignmentSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['job', 'year', 'person', 'person__contract_type']
@@ -129,7 +156,8 @@ class UniteViewSet(viewsets.ModelViewSet):
 class CompanyViewSet(viewsets.ModelViewSet):
     queryset = Company.objects.all()
     serializer_class = CompanySerializer
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['unite']
     search_fields = ['name', 'code']
     ordering_fields = ['name', 'created_at']
 
@@ -196,11 +224,31 @@ class JobViewSet(viewsets.ModelViewSet):
                 return self._integrity_error_response(exc)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class YearViewSet(viewsets.ModelViewSet):
-    queryset = Year.objects.all()
-    serializer_class = YearSerializer
-    filter_backends = [filters.OrderingFilter]
-    ordering_fields = ['year', 'created_at']
+class YearViewSet(viewsets.ViewSet):
+    """
+    Compatibility endpoint returning distinct fiscal years now sourced from operational data.
+    """
+
+    def list(self, request):
+        years = set(Assignment.objects.values_list("year", flat=True))
+        years.update(UniteQuota.objects.values_list("year", flat=True))
+        years = [value for value in years if value is not None]
+
+        ordering = request.query_params.get("ordering", "-year")
+        reverse = ordering.startswith("-")
+        years.sort(reverse=reverse)
+
+        payload = [
+            {
+                "id": year,
+                "year": year,
+                "total_quota": None,
+                "is_closed": False,
+                "created_at": None,
+            }
+            for year in years
+        ]
+        return Response(payload)
 
 class PersonViewSet(viewsets.ModelViewSet):
     queryset = Person.objects.select_related(
@@ -211,7 +259,7 @@ class PersonViewSet(viewsets.ModelViewSet):
     ).prefetch_related(
         Prefetch(
             "assignments",
-            queryset=Assignment.objects.select_related("job__company__unite", "year").order_by("-year__year", "-created_at"),
+            queryset=Assignment.objects.select_related("job__company__unite").order_by("-year", "-created_at"),
             to_attr="prefetched_assignments",
         )
     )
@@ -232,32 +280,27 @@ class PersonViewSet(viewsets.ModelViewSet):
 
 # Gain/Loss views only need Read-Only access 
 class GainViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Gain.objects.select_related("person", "unite", "company", "year").all()
+    queryset = Gain.objects.select_related("person", "unite", "company").all()
     serializer_class = GainSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['unite', 'company', 'year']
 
 class LossViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Loss.objects.select_related("person", "unite", "company", "year").all()
+    queryset = Loss.objects.select_related("person", "unite", "company").all()
     serializer_class = LossSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['unite', 'company', 'year']
 
 @api_view(['GET'])
 def transfer_suggestions(request):
-    year_id = request.GET.get('year_id')
+    year, error_response = _get_requested_year(request)
+    if error_response is not None:
+        return error_response
+
     transfer_kind = request.GET.get('transfer_kind', 'all').lower()
     if transfer_kind == 'intern':
         transfer_kind = 'internal'
     limit = request.GET.get('limit', 100)
-
-    if not year_id:
-        return Response({"error": "year_id parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        year_id = int(year_id)
-    except (TypeError, ValueError):
-        return Response({"error": "year_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
 
     if transfer_kind not in {'all', 'internal', 'external'}:
         return Response(
@@ -273,13 +316,14 @@ def transfer_suggestions(request):
     limit = max(1, min(limit, 500))
 
     suggestions = build_transfer_suggestions(
-        year_id=year_id,
+        year=year,
         transfer_kind=transfer_kind,
         limit=limit,
     )
 
     return Response({
-        "year_id": year_id,
+        "year_id": year,
+        "year": year,
         "transfer_kind": transfer_kind,
         "count": len(suggestions),
         "results": suggestions,
