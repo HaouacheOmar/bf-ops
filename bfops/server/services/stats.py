@@ -33,7 +33,7 @@ def _assignment_counts_by_job(year=None):
 
 def job_statistics(year=None):
 
-    jobs = Job.objects.select_related("company__unite").exclude(name__iexact="En attente d'affectation")
+    jobs = Job.objects.filter(is_in_quota=True).select_related("company__unite").exclude(name__iexact="En attente d'affectation")
     job_counts = _assignment_counts_by_job(year)
     results = []
     for job in jobs:
@@ -64,7 +64,7 @@ def unite_statistics(year_id=None):
     """
     Returns a list of unite stats for the given year, using UniteQuota as capacity.
     """
-    jobs = Job.objects.select_related("company__unite").exclude(name__iexact="En attente d'affectation")
+    jobs = Job.objects.filter(is_in_quota=True).select_related("company__unite").exclude(name__iexact="En attente d'affectation")
     job_counts = _assignment_counts_by_job(year_id)
 
     quota_qs = UniteQuota.objects.select_related("unite")
@@ -147,7 +147,7 @@ def company_statistics(year=None):
     """
     Returns a list of company stats for the given year, aggregating jobs in each company.
     """
-    jobs = Job.objects.select_related("company__unite").exclude(name__iexact="En attente d'affectation")
+    jobs = Job.objects.filter(is_in_quota=True).select_related("company__unite").exclude(name__iexact="En attente d'affectation")
     company_map = {}
     
     for job in jobs:

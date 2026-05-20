@@ -1,7 +1,9 @@
 from urllib.parse import urlencode
+import re
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.db.models import Prefetch
+from django.utils import timezone
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
@@ -16,6 +18,29 @@ from .serializers import (
 )
 from .services.stats import company_statistics, job_statistics, unite_statistics
 from .services.transfer_suggestions import build_transfer_suggestions
+
+
+def _normalize_text(value):
+    return re.sub(r"\s+", " ", str(value or "")).strip().lower()
+
+
+def _sanitize_code_seed(value, fallback):
+    seed = re.sub(r"[^A-Za-z0-9]+", "-", str(value or "").strip().upper()).strip("-")
+    return seed or fallback
+
+
+def _generate_unique_code(model_cls, seed, fallback="AUTO", max_length=50):
+    base = _sanitize_code_seed(seed, fallback)
+    candidate = base[:max_length]
+    suffix = 2
+
+    while model_cls.objects.filter(code=candidate).exists():
+        suffix_token = f"-{suffix}"
+        trimmed = base[: max_length - len(suffix_token)]
+        candidate = f"{trimmed}{suffix_token}"
+        suffix += 1
+
+    return candidate
 
 
 def _get_requested_year(request, *, required=True):
@@ -113,18 +138,14 @@ class AssignmentViewSet(viewsets.ModelViewSet):
     queryset = Assignment.objects.select_related("person", "job", "job__company__unite").all()
     serializer_class = AssignmentSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['job', 'year', 'person', 'person__contract_type']
-    search_fields = ['person__first_name', 'person__last_name', 'job__name']
+    filterset_fields = ['job', 'job__name', 'year', 'person', 'person__contract_type']
+    search_fields = ['person__first_name', 'person__last_name', 'person__matricule', 'job__name']
     ordering_fields = ['created_at', 'year', 'job']
 
     def perform_create(self, serializer):
-        assignment = serializer.save()
-        job = assignment.job
-        Gain.objects.create(person=assignment.person, year=assignment.year, unite=job.company.unite if job.company else None, company=job.company)
+        serializer.save()
 
     def perform_destroy(self, instance):
-        job = instance.job
-        Loss.objects.create(person=instance.person, year=instance.year, unite=job.company.unite if job.company else None, company=job.company)
         instance.delete()
 
 class GradeViewSet(viewsets.ModelViewSet):
@@ -132,7 +153,79 @@ class GradeViewSet(viewsets.ModelViewSet):
     serializer_class = GradeSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'code']
-    ordering_fields = ['name', 'created_at']
+    ordering_fields = ['name', 'rating', 'created_at']
+
+    def _with_generated_code_if_missing(self, payload):
+        data = payload.copy() if hasattr(payload, "copy") else dict(payload)
+        if not str(data.get("code", "")).strip():
+            data["code"] = _generate_unique_code(Grade, data.get("name"), fallback="GRD")
+        return data
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=self._with_generated_code_if_missing(request.data))
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=self._with_generated_code_if_missing(request.data), partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['post'])
+    def bulk_create(self, request):
+        if not isinstance(request.data, list):
+            return Response({"error": "Expected a list of objects."}, status=status.HTTP_400_BAD_REQUEST)
+
+        created = []
+        errors = []
+
+        for index, row in enumerate(request.data):
+            row_number = index + 2
+            name = str(row.get("name", "")).strip()
+            code = str(row.get("code", "")).strip()
+            rating_raw = row.get("rating", None)
+
+            if not name:
+                errors.append(f"Row {row_number}: Missing grade name.")
+                continue
+
+            try:
+                rating = int(rating_raw)
+            except (TypeError, ValueError):
+                errors.append(f"Row {row_number}: Rating must be an integer.")
+                continue
+
+            if not code:
+                code = _generate_unique_code(Grade, name, fallback="GRD")
+
+            serializer = self.get_serializer(data={"name": name, "code": code, "rating": rating})
+            if serializer.is_valid():
+                serializer.save()
+                created.append(serializer.data)
+            else:
+                errors.append(f"Row {row_number}: {serializer.errors}")
+
+        if not created and errors:
+            return Response({"error": "All rows failed.", "details": errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {
+                "message": f"Successfully created {len(created)} grades.",
+                "count": len(created),
+                "errors": errors if errors else None,
+                "results": created,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 class UniteViewSet(viewsets.ModelViewSet):
     queryset = Unite.objects.all()
@@ -160,6 +253,88 @@ class CompanyViewSet(viewsets.ModelViewSet):
     filterset_fields = ['unite']
     search_fields = ['name', 'code']
     ordering_fields = ['name', 'created_at']
+
+    def _with_generated_code_if_missing(self, payload):
+        data = payload.copy() if hasattr(payload, "copy") else dict(payload)
+        if not str(data.get("code", "")).strip():
+            data["code"] = _generate_unique_code(Company, data.get("name"), fallback="COMP")
+        return data
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=self._with_generated_code_if_missing(request.data))
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=self._with_generated_code_if_missing(request.data), partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['post'])
+    def bulk_create(self, request):
+        if not isinstance(request.data, list):
+            return Response({"error": "Expected a list of objects."}, status=status.HTTP_400_BAD_REQUEST)
+
+        created = []
+        errors = []
+        unites = list(Unite.objects.all())
+
+        for index, row in enumerate(request.data):
+            row_number = index + 2
+            name = str(row.get("name", "")).strip()
+            code = str(row.get("code", "")).strip()
+            unite_value = row.get("unite")
+
+            if not name:
+                errors.append(f"Row {row_number}: Missing company name.")
+                continue
+
+            if unite_value in (None, ""):
+                errors.append(f"Row {row_number}: Missing unite.")
+                continue
+
+            unite_obj = None
+            if str(unite_value).strip().isdigit():
+                unite_obj = next((u for u in unites if u.id == int(str(unite_value).strip())), None)
+            if unite_obj is None:
+                normalized_input = _normalize_text(unite_value)
+                unite_obj = next((u for u in unites if _normalize_text(u.name) == normalized_input), None)
+
+            if unite_obj is None:
+                errors.append(f"Row {row_number}: Unite '{unite_value}' does not exist.")
+                continue
+
+            if not code:
+                code = _generate_unique_code(Company, name, fallback="COMP")
+
+            serializer = self.get_serializer(data={"name": name, "code": code, "unite": unite_obj.id})
+            if serializer.is_valid():
+                serializer.save()
+                created.append(serializer.data)
+            else:
+                errors.append(f"Row {row_number}: {serializer.errors}")
+
+        if not created and errors:
+            return Response({"error": "All rows failed.", "details": errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {
+                "message": f"Successfully created {len(created)} companies.",
+                "count": len(created),
+                "errors": errors if errors else None,
+                "results": created,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 class JobViewSet(viewsets.ModelViewSet):
     queryset = Job.objects.all()
@@ -224,6 +399,13 @@ class JobViewSet(viewsets.ModelViewSet):
                 return self._integrity_error_response(exc)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except IntegrityError as exc:
+            return self._integrity_error_response(exc)
+
 class YearViewSet(viewsets.ViewSet):
     """
     Compatibility endpoint returning distinct fiscal years now sourced from operational data.
@@ -268,15 +450,72 @@ class PersonViewSet(viewsets.ModelViewSet):
     search_fields = ['first_name', 'last_name', 'matricule']
     ordering_fields = ['last_name', 'first_name', 'created_at']
 
+    def perform_create(self, serializer):
+        person = serializer.save()
+        Gain.objects.create(
+            person=person,
+            unite=person.unite,
+            company=person.company,
+            year=timezone.now().year
+        )
+
+    def perform_destroy(self, instance):
+        Loss.objects.create(
+            person=instance,
+            unite=instance.unite,
+            company=instance.company,
+            year=timezone.now().year
+        )
+        instance.delete()
+
     @action(detail=False, methods=['post'])
     def bulk_create(self, request):
         if not isinstance(request.data, list):
             return Response({"error": "Expected a list of objects."}, status=status.HTTP_400_BAD_REQUEST)
-        serializer = self.get_serializer(data=request.data, many=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        created_count = 0
+        updated_count = 0
+        errors = []
+
+        for index, item_data in enumerate(request.data):
+            matricule = item_data.get('matricule')
+            if not matricule:
+                errors.append(f"Row {index + 1}: Missing matricule.")
+                continue
+            
+            try:
+                # Update if matricule exists, otherwise create
+                person, created = Person.objects.update_or_create(
+                    matricule=matricule,
+                    defaults={
+                        'first_name': item_data.get('first_name', ''),
+                        'last_name': item_data.get('last_name', ''),
+                        'contract_type': item_data.get('contract_type', 'actif'),
+                        'grade_id': item_data.get('grade'),
+                        'unite_id': item_data.get('unite'),
+                        'company_id': item_data.get('company'),
+                    }
+                )
+                if created:
+                    created_count += 1
+                    Gain.objects.create(
+                        person=person,
+                        unite=person.unite,
+                        company=person.company,
+                        year=timezone.now().year
+                    )
+                else:
+                    updated_count += 1
+            except Exception as e:
+                errors.append(f"Row {index + 1}: {str(e)}")
+
+        if errors and created_count == 0 and updated_count == 0:
+            return Response({"error": "All rows failed.", "details": errors}, status=status.HTTP_400_BAD_REQUEST)
+            
+        return Response({
+            "message": f"Successfully created {created_count} and updated {updated_count} persons.",
+            "errors": errors if errors else None
+        }, status=status.HTTP_200_OK)
 
 # Gain/Loss views only need Read-Only access 
 class GainViewSet(viewsets.ReadOnlyModelViewSet):
@@ -340,6 +579,7 @@ def _person_is_eligible_for_job(person, destination_job):
 @api_view(['POST'])
 @transaction.atomic
 def execute_transfer(request):
+    person_id = request.data.get('person_id')
     assignment_id = request.data.get('assignment_id')
     new_unite_id = request.data.get('new_unite_id')
     new_company_id = request.data.get('new_company_id')
@@ -347,14 +587,29 @@ def execute_transfer(request):
     reason = request.data.get('reason', 'Transfert Unité')
 
     try:
-        assignment = Assignment.objects.select_related('job__company__unite').get(id=assignment_id)
         new_unite = Unite.objects.get(id=new_unite_id)
-    except (Assignment.DoesNotExist, Unite.DoesNotExist):
-        return Response({"error": "Assignment or Destination Unite not found."}, status=status.HTTP_404_NOT_FOUND)
+        person = None
+        assignment = None
+        old_job = None
+        old_company = None
+        old_unite = None
 
-    old_job = assignment.job
-    old_company = old_job.company
-    old_unite = old_company.unite
+        if person_id:
+            person = Person.objects.select_related("job", "company", "unite").get(id=person_id)
+            # Find the active or latest assignment for the person if any
+            assignment = Assignment.objects.filter(person=person).order_by("-year", "-created_at").first()
+            old_unite = person.unite
+            old_company = person.company
+            old_job = person.job
+        else:
+            assignment = Assignment.objects.select_related('job__company__unite').get(id=assignment_id)
+            person = assignment.person
+            old_job = assignment.job
+            old_company = old_job.company
+            old_unite = old_company.unite
+
+    except (Assignment.DoesNotExist, Person.DoesNotExist, Unite.DoesNotExist):
+        return Response({"error": "Worker or Destination Unite not found."}, status=status.HTTP_404_NOT_FOUND)
 
     destination_company = None
     destination_job = None
@@ -405,20 +660,13 @@ def execute_transfer(request):
         )
 
     if not destination_job:
-        same_name_jobs = Job.objects.filter(company=destination_company, name=old_job.name).order_by('id')
-        for candidate in same_name_jobs:
-            if _person_is_eligible_for_job(assignment.person, candidate):
-                destination_job = candidate
-                break
-
-    if not destination_job:
         destination_job, _ = Job.objects.get_or_create(
             company=destination_company,
             name="En attente d'affectation",
-            defaults={"code": f"ATT-{new_unite.code}", "max_workers": 999},
+            defaults={"code": f"ATT-{destination_company.id}-{new_unite.code}", "max_workers": 0, "is_in_quota": False},
         )
 
-    if not _person_is_eligible_for_job(assignment.person, destination_job):
+    if not _person_is_eligible_for_job(person, destination_job) and destination_job.name != "En attente d'affectation":
         return Response(
             {"error": "The worker's grade does not match the destination job requirements."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -426,20 +674,31 @@ def execute_transfer(request):
 
     if (
         old_unite == new_unite
-        and old_company.id == destination_company.id
-        and old_job.id == destination_job.id
+        and getattr(old_company, 'id', None) == destination_company.id
+        and getattr(old_job, 'id', None) == destination_job.id
     ):
         return Response(
             {"error": "The worker is already assigned to this destination."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    Loss.objects.create(person=assignment.person, year=assignment.year, unite=old_unite, company=old_company)
-    Gain.objects.create(person=assignment.person, year=assignment.year, unite=new_unite, company=destination_company)
+    year_val = assignment.year if assignment else timezone.now().year
     
-    TransferHistory.objects.create(assignment=assignment, from_unite=old_unite, to_unite=new_unite, reason=reason)
+    if old_unite:
+        Loss.objects.create(person=person, year=year_val, unite=old_unite, company=old_company)
+    Gain.objects.create(person=person, year=year_val, unite=new_unite, company=destination_company)
+    
+    if not assignment:
+        assignment = Assignment.objects.create(person=person, year=year_val, job=destination_job)
+        TransferHistory.objects.create(assignment=assignment, from_unite=old_unite, to_unite=new_unite, reason=reason)
+    else:
+        TransferHistory.objects.create(assignment=assignment, from_unite=old_unite, to_unite=new_unite, reason=reason)
+        assignment.job = destination_job
+        assignment.save()
 
-    assignment.job = destination_job
-    assignment.save()
+    person.unite = new_unite
+    person.company = destination_company
+    person.job = destination_job
+    person.save()
 
     return Response({"message": f"Transfert réussi vers l'unité {new_unite.name}."}, status=status.HTTP_200_OK)

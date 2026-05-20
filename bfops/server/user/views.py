@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.cache import cache
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.response import Response
@@ -203,6 +204,9 @@ class LogoutView(APIView):
                 token.blacklist()
             except TokenError:
                 pass
+
+        # Clear all cache on logout
+        cache.clear()
 
         response = Response({"message": "Logout successful"}, status=status.HTTP_200_OK)
         response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE'])

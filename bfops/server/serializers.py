@@ -57,6 +57,7 @@ class JobSerializer(serializers.ModelSerializer):
             "grades", 
             "accepted_grades_info", 
             "max_workers",
+            "is_in_quota",
             "created_at",
         ]
 
@@ -85,6 +86,7 @@ class GradeSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "code",
+            "rating",
             "created_at",
         ]
 
@@ -124,6 +126,8 @@ class CompanySerializer(serializers.ModelSerializer):
 
 class PersonSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
+    grade_name = serializers.CharField(source="grade.name", read_only=True)
+    grade_rating = serializers.IntegerField(source="grade.rating", read_only=True)
     unite_name = serializers.CharField(source="unite.name", read_only=True)
     company_name = serializers.CharField(source="company.name", read_only=True)
     job_name = serializers.CharField(source="job.name", read_only=True)
@@ -138,6 +142,8 @@ class PersonSerializer(serializers.ModelSerializer):
             "matricule",
             "contract_type",
             "grade",
+            "grade_name",
+            "grade_rating",
             "unite",
             "company",
             "job",
@@ -202,6 +208,7 @@ class PersonSerializer(serializers.ModelSerializer):
 class AssignmentSerializer(serializers.ModelSerializer):
     person_name = serializers.CharField(source="person.__str__", read_only=True)
     job_name = serializers.CharField(source="job.name", read_only=True)
+    person_matricule = serializers.CharField(source="person.matricule", read_only=True)
     company_id = serializers.IntegerField(source="job.company.id", read_only=True)
     company_name = serializers.CharField(source="job.company.name", read_only=True)
     unite_id = serializers.IntegerField(source="job.company.unite.id", read_only=True)
@@ -220,6 +227,7 @@ class AssignmentSerializer(serializers.ModelSerializer):
             "person",
             "job",
             "person_name",
+            "person_matricule",
             "job_name",
             "company_id",
             "company_name",

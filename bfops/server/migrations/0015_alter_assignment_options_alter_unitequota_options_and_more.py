@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('server', '0004_remove_assignment_contract_type_remove_job_grade_and_more'),
+        ('server', '0013_allow_null_year_on_assignment_gain_loss'),
     ]
 
     operations = [
@@ -40,28 +40,10 @@ class Migration(migrations.Migration):
             model_name='person',
             name='unite',
         ),
-        migrations.RemoveField(
-            model_name='year',
-            name='is_closed',
-        ),
-        migrations.RemoveField(
-            model_name='year',
-            name='total_quota',
-        ),
         migrations.AddField(
             model_name='job',
             name='grade',
             field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='server.grade'),
-        ),
-        migrations.AddField(
-            model_name='transferhistory',
-            name='from_company',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='transfers_out', to='server.company'),
-        ),
-        migrations.AddField(
-            model_name='transferhistory',
-            name='to_company',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='transfers_in', to='server.company'),
         ),
         migrations.AddField(
             model_name='unitequota',
@@ -108,15 +90,5 @@ class Migration(migrations.Migration):
             model_name='unitequota',
             name='unite',
             field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='quotas', to='server.unite'),
-        ),
-        migrations.AlterField(
-            model_name='unitequota',
-            name='year',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='quotas', to='server.year'),
-        ),
-        migrations.AlterField(
-            model_name='year',
-            name='year',
-            field=models.IntegerField(unique=True),
         ),
     ]

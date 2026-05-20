@@ -99,11 +99,11 @@ WSGI_APPLICATION = 'bfops.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'bfops_db',         
-        'USER': 'postgres',         
-        'PASSWORD': 'root',         
-        'HOST': 'localhost',       
-        'PORT': '5432',             
+        'NAME': os.environ.get('DJANGO_DB_NAME', 'bfops_db'),         
+        'USER': os.environ.get('DJANGO_DB_USER', 'postgres'),         
+        'PASSWORD': os.environ.get('DJANGO_DB_PASSWORD', 'root'),         
+        'HOST': os.environ.get('DJANGO_DB_HOST', 'localhost'),       
+        'PORT': os.environ.get('DJANGO_DB_PORT', '5432'),             
     }
 }
 
@@ -149,6 +149,7 @@ AUTH_USER_MODEL = 'user.User'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
+    'EXCEPTION_HANDLER': 'server.exceptions.custom_exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'server.user.authentication.CookieJWTAuthentication',
     )

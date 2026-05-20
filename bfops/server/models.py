@@ -3,10 +3,11 @@ from django.db import models
 class Grade(models.Model):
     name = models.CharField(max_length=100, unique=True)
     code = models.CharField(max_length=50, unique=True)
+    rating = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["name"]
+        ordering = ["-rating", "name"]
 
     def __str__(self):
         return self.name
@@ -55,6 +56,7 @@ class Job(models.Model):
             related_name="jobs"
         )
     max_workers = models.PositiveIntegerField()
+    is_in_quota = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -91,6 +93,8 @@ class Person(models.Model):
         Grade,
         on_delete=models.SET_NULL,
         null=True,
+
+        
         blank=True,
         related_name="persons"
     )
@@ -120,6 +124,7 @@ class Person(models.Model):
         choices=(
             ("actif", "Actif"),
             ("contractuel", "Contractuel"),
+            ("reserve", "Reserve"),
         ),
         default="actif"
     )
