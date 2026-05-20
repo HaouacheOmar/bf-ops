@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Chip,
@@ -20,17 +21,19 @@ import {
 } from '@mui/material';
 import { useI18n } from '../i18n/translator';
 
-type Assignment = {
+type Person = {
   id: number;
-  person_name: string;
-  job_name: string;
-  job: number;
-  year: number;
-  year_value: number;
-  company_id?: number | null;
-  company_name?: string;
+  first_name: string;
+  last_name: string;
+  matricule: string;
   unite_id?: number | null;
-  unite_name: string;
+  unite?: number | null;
+  unite_name?: string;
+  company_id?: number | null;
+  company?: number | null;
+  company_name?: string;
+  job?: number | null;
+  job_name?: string;
 };
 
 type Unite = {
@@ -96,7 +99,7 @@ const asList = (payload: any) => payload?.results || payload || [];
 
 export default function TransferPage() {
   const { t } = useI18n();
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [persons, setPersons] = useState<Person[]>([]);
   const [years, setYears] = useState<Year[]>([]);
   const [unites, setUnites] = useState<Unite[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -104,7 +107,7 @@ export default function TransferPage() {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [suggestions, setSuggestions] = useState<TransferSuggestion[]>([]);
 
-  const [selectedAssignment, setSelectedAssignment] = useState('');
+  const [selectedPerson, setSelectedPerson] = useState('');
   const [transferMode, setTransferMode] = useState<TransferMode>('external');
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedUnite, setSelectedUnite] = useState('');
@@ -116,7 +119,10 @@ export default function TransferPage() {
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [validatingSuggestionId, setValidatingSuggestionId] = useState<number | null>(null);
 
-  const [currentWorkerInfo, setCurrentWorkerInfo] = useState<Assignment | null>(null);
+  const [personSearch, setPersonSearch] = useState('');
+  const [currentWorkerInfo, setCurrentWorkerInfo] = useState<Person | null>(null);
+
+  const getCurrentUniteId = (person: Person | null) => person?.unite_id ?? person?.unite ?? null;
 
   const loadTransfers = async () => {
     const transfersRes = await fetch('/api/transfers/?ordering=-transfer_date');
@@ -151,14 +157,12 @@ export default function TransferPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/assignments/').then((res) => res.json()),
       fetch('/api/years/?ordering=-year').then((res) => res.json()),
       fetch('/api/unites/').then((res) => res.json()),
       fetch('/api/companies/').then((res) => res.json()),
       fetch('/api/jobs/').then((res) => res.json()),
       fetch('/api/transfers/?ordering=-transfer_date').then((res) => res.json()),
-    ]).then(([assignmentsData, yearsData, unitesData, companiesData, jobsData, transfersData]) => {
-      setAssignments(asList(assignmentsData));
+    ]).then(([yearsData, unitesData, companiesData, jobsData, transfersData]) => {
       const parsedYears = asList(yearsData) as Year[];
       setYears(parsedYears);
       if (parsedYears.length > 0) {
@@ -172,36 +176,58 @@ export default function TransferPage() {
   }, []);
 
   useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      const params = new URLSearchParams();
+      if (personSearch) {
+        params.append('search', personSearch);
+      }
+      fetch(`/api/persons/?${params.toString()}`)
+        .then(res => res.json())
+        .then(data => {
+          setPersons(asList(data));
+        });
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [personSearch]);
+
+  useEffect(() => {
     void loadSuggestions();
   }, [selectedYear]);
 
   useEffect(() => {
-    if (selectedAssignment) {
-      setCurrentWorkerInfo(assignments.find((a) => String(a.id) === selectedAssignment) || null);
-    } else {
+    if (!selectedPerson) {
       setCurrentWorkerInfo(null);
     }
-  }, [selectedAssignment, assignments]);
+  }, [selectedPerson]);
+
+  const searchOptions = useMemo(() => {
+    if (currentWorkerInfo && !persons.find(p => p.id === currentWorkerInfo.id)) {
+      return [...persons, currentWorkerInfo];
+    }
+    return persons;
+  }, [persons, currentWorkerInfo]);
 
   const destinationCompanies = useMemo(
     () => {
-      const scopedCompanies = companies.filter((company) => String(company.unite) === selectedUnite);
-      if (transferMode !== 'intern' || !currentWorkerInfo?.company_id) {
-        return scopedCompanies;
-      }
-      return scopedCompanies.filter((company) => company.id !== currentWorkerInfo.company_id);
+      const effectiveUniteId = transferMode === 'intern'
+        ? String(getCurrentUniteId(currentWorkerInfo) ?? '')
+        : selectedUnite;
+      const scopedCompanies = companies.filter((company) => String(company.unite) === effectiveUniteId);
+      return scopedCompanies;
     },
     [companies, selectedUnite, transferMode, currentWorkerInfo],
   );
 
   const destinationUnites = useMemo(() => {
-    if (!currentWorkerInfo?.unite_id) {
+    const currentUniteId = getCurrentUniteId(currentWorkerInfo);
+    if (!currentUniteId) {
       return unites;
     }
     if (transferMode === 'intern') {
-      return unites.filter((unite) => unite.id === currentWorkerInfo.unite_id);
+      return unites.filter((unite) => unite.id === currentUniteId);
     }
-    return unites.filter((unite) => unite.id !== currentWorkerInfo.unite_id);
+    return unites.filter((unite) => unite.id !== currentUniteId);
   }, [unites, currentWorkerInfo, transferMode]);
 
   const destinationJobs = useMemo(() => {
@@ -211,6 +237,15 @@ export default function TransferPage() {
     const companyIds = new Set(destinationCompanies.map((company) => company.id));
     return jobs.filter((job) => companyIds.has(job.company));
   }, [jobs, destinationCompanies, selectedCompany]);
+
+  const currentJobExistsInDestinationCompany = useMemo(() => {
+    if (transferMode !== 'intern' || !currentWorkerInfo?.job_name || !selectedCompany) {
+      return true;
+    }
+
+    const normalizedCurrentJobName = String(currentWorkerInfo.job_name).trim().toLowerCase();
+    return destinationJobs.some((job) => String(job.name).trim().toLowerCase() === normalizedCurrentJobName);
+  }, [destinationJobs, currentWorkerInfo?.job_name, selectedCompany, transferMode]);
 
   useEffect(() => {
     setSelectedCompany('');
@@ -222,17 +257,18 @@ export default function TransferPage() {
     setSelectedCompany('');
     setSelectedJob('');
 
-    if (!currentWorkerInfo?.unite_id) {
+    if (!getCurrentUniteId(currentWorkerInfo)) {
       return;
     }
 
     if (transferMode === 'intern') {
-      setSelectedUnite(String(currentWorkerInfo.unite_id));
+      const currentUniteId = getCurrentUniteId(currentWorkerInfo);
+      setSelectedUnite(currentUniteId ? String(currentUniteId) : '');
       return;
     }
 
     setSelectedUnite((prev) => (
-      prev === String(currentWorkerInfo.unite_id) ? '' : prev
+      prev === String(getCurrentUniteId(currentWorkerInfo)) ? '' : prev
     ));
   }, [transferMode, currentWorkerInfo]);
 
@@ -243,7 +279,11 @@ export default function TransferPage() {
   const handleTransfer = async () => {
     setTransferError('');
 
-    if (!selectedAssignment || !selectedUnite) {
+    const effectiveUniteId = transferMode === 'intern'
+      ? (getCurrentUniteId(currentWorkerInfo) ? String(getCurrentUniteId(currentWorkerInfo)) : '')
+      : selectedUnite;
+
+    if (!selectedPerson || !effectiveUniteId) {
       alert(t('Please select a worker and a destination unite.'));
       return;
     }
@@ -256,18 +296,8 @@ export default function TransferPage() {
       : selectedJobEntity?.company || null;
 
     if (transferMode === 'intern') {
-      if (!currentWorkerInfo?.unite_id || String(currentWorkerInfo.unite_id) !== selectedUnite) {
-        setTransferError(t('Intern transfer must stay in the same unite.'));
-        return;
-      }
-
       if (!destinationCompanyId) {
         setTransferError(t('For intern transfer, select a destination company or destination job.'));
-        return;
-      }
-
-      if (currentWorkerInfo?.company_id && destinationCompanyId === currentWorkerInfo.company_id) {
-        setTransferError(t('Intern transfer requires a different destination company.'));
         return;
       }
     } else if (currentWorkerInfo?.unite_id && String(currentWorkerInfo.unite_id) === selectedUnite) {
@@ -279,8 +309,8 @@ export default function TransferPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        assignment_id: selectedAssignment,
-        new_unite_id: selectedUnite,
+        person_id: selectedPerson,
+        new_unite_id: effectiveUniteId,
         new_company_id: selectedCompany || null,
         new_job_id: selectedJob || null,
         reason: reason
@@ -291,7 +321,7 @@ export default function TransferPage() {
 
     if (response.ok) {
       alert(t(data?.message || 'Transfer completed successfully.'));
-      setSelectedAssignment('');
+      setSelectedPerson('');
       setSelectedUnite('');
       setSelectedCompany('');
       setSelectedJob('');
@@ -375,18 +405,19 @@ export default function TransferPage() {
             </FormControl>
 
             <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>{t('1. Select Worker')}</InputLabel>
-              <Select
-                value={selectedAssignment}
-                onChange={(e) => setSelectedAssignment(e.target.value)}
-                label={t('1. Select Worker')}
-              >
-                {assignments.map((a) => (
-                  <MenuItem key={a.id} value={String(a.id)}>
-                    {a.person_name}
-                  </MenuItem>
-                ))}
-              </Select>
+              <Autocomplete
+                options={searchOptions}
+                filterOptions={(options) => options}
+                getOptionLabel={(option) => option.matricule ? `${option.first_name} ${option.last_name} (${option.matricule})` : `${option.first_name} ${option.last_name}`}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                value={currentWorkerInfo}
+                onInputChange={(_, val) => setPersonSearch(val)}
+                onChange={(_, val) => {
+                  setSelectedPerson(val ? String(val.id) : '');
+                  setCurrentWorkerInfo(val || null);
+                }}
+                renderInput={(params) => <TextField {...params} label={t('1. Select Worker')} variant="outlined" placeholder={t('Search by Name or Matricule...')} />}
+              />
             </FormControl>
 
             {currentWorkerInfo && (
@@ -407,28 +438,26 @@ export default function TransferPage() {
               </Alert>
             )}
 
-            {transferMode === 'intern' && (
+            {transferMode === 'intern' ? (
               <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
-                {t('Intern transfer moves the worker within the same unite to a different company. You can select the same job or a different compatible job.')}
+                {t('Intern transfer stays within the same unite. You can choose a company and optionally assign a job, or leave the job pending.')}
               </Alert>
+            ) : (
+              <FormControl fullWidth sx={{ mb: 3 }}>
+                <InputLabel>{t('2. Destination Unite')}</InputLabel>
+                <Select
+                  value={selectedUnite}
+                  onChange={(e) => setSelectedUnite(e.target.value)}
+                  label={t('2. Destination Unite')}
+                >
+                  {destinationUnites.map((u) => (
+                    <MenuItem key={u.id} value={String(u.id)}>
+                      {u.name} ({u.code})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             )}
-
-            <FormControl fullWidth sx={{ mb: 3 }}>
-              <InputLabel>
-                {transferMode === 'intern' ? t('2. Current Unite') : t('2. Destination Unite')}
-              </InputLabel>
-              <Select
-                value={selectedUnite}
-                onChange={(e) => setSelectedUnite(e.target.value)}
-                label={transferMode === 'intern' ? t('2. Current Unite') : t('2. Destination Unite')}
-              >
-                {destinationUnites.map((u) => (
-                  <MenuItem key={u.id} value={String(u.id)}>
-                    {u.name} ({u.code})
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
 
             {transferError && (
               <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
@@ -436,7 +465,7 @@ export default function TransferPage() {
               </Alert>
             )}
 
-            <FormControl fullWidth sx={{ mb: 3 }} disabled={!selectedUnite}>
+            <FormControl fullWidth sx={{ mb: 3 }} disabled={transferMode !== 'intern' && !selectedUnite}>
               <InputLabel>
                 {transferMode === 'intern' ? t('3. Destination Company') : t('3. Company (optional)')}
               </InputLabel>
@@ -445,7 +474,7 @@ export default function TransferPage() {
                 onChange={(e) => setSelectedCompany(e.target.value)}
                 label={transferMode === 'intern' ? t('3. Destination Company') : t('3. Company (optional)')}
               >
-                <MenuItem value="">{t('No selection')}</MenuItem>
+                <MenuItem value="">{t('Select destination company...')}</MenuItem>
                 {destinationCompanies.map((company) => (
                   <MenuItem key={company.id} value={String(company.id)}>
                     {company.name}
@@ -453,6 +482,12 @@ export default function TransferPage() {
                 ))}
               </Select>
             </FormControl>
+
+            {transferMode === 'intern' && selectedCompany && !currentJobExistsInDestinationCompany && currentWorkerInfo?.job_name && (
+              <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
+                {t('The current job is not available in the destination company. This transfer will keep it as NOT TED / pending assignment unless you pick another job.')}
+              </Alert>
+            )}
 
             <FormControl fullWidth sx={{ mb: 3 }} disabled={!selectedUnite}>
               <InputLabel>{t('4. Job (optional)')}</InputLabel>

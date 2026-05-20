@@ -138,9 +138,12 @@ export default function GainLossPage() {
         <Grid size={{ xs: 12, md: 6 }}>
           {/* Styled to match the others, but with a green accent bar at the top */}
           <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%', borderTop: '4px solid', borderColor: 'success.main' }}>
-            <Typography variant="h6" fontWeight="medium" color="success.main" mb={2}>
-              {t('Gains (New Hires & Transfers In)')}
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" fontWeight="medium" color="success.main">
+                {t('Gains (New Hires & Transfers In)')}
+              </Typography>
+              <Chip label={gains.length} color="success" size="small" />
+            </Box>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -171,9 +174,12 @@ export default function GainLossPage() {
         <Grid size={{ xs: 12, md: 6 }}>
           {/* Styled to match the others, but with a red accent bar at the top */}
           <Paper elevation={2} sx={{ p: 3, borderRadius: 2, height: '100%', borderTop: '4px solid', borderColor: 'error.main' }}>
-            <Typography variant="h6" fontWeight="medium" color="error.main" mb={2}>
-              {t('Losses (Deletions & Transfers Out)')}
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" fontWeight="medium" color="error.main">
+                {t('Losses (Deletions & Transfers Out)')}
+              </Typography>
+              <Chip label={losses.length} color="error" size="small" />
+            </Box>
             <Table size="small">
               <TableHead>
                 <TableRow>
@@ -203,9 +209,12 @@ export default function GainLossPage() {
       </Grid>
 
       <Paper elevation={2} sx={{ mt: 3, p: 3, borderRadius: 2, borderTop: '4px solid', borderColor: 'primary.main' }}>
-        <Typography variant="h6" fontWeight="medium" color="primary.main" mb={2}>
-          {t('Transfer Movements (from_unite to to_unite)')}
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6" fontWeight="medium" color="primary.main">
+            {t('Transfer Movements (from_unite to to_unite)')}
+          </Typography>
+          <Chip label={filteredTransfers.length} color="primary" size="small" />
+        </Box>
         <Table size="small">
           <TableHead>
             <TableRow>

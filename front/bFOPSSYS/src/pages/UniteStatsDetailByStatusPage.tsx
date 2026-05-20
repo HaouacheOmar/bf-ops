@@ -131,6 +131,8 @@ const UniteStatsDetailByStatusPage: React.FC = () => {
           </TableContainer>
         </Paper>
       ))}
+        </>
+      )}
     </Box>
   );
 };

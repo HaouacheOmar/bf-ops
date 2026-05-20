@@ -4,12 +4,14 @@ import { Box, Tab, Tabs, Dialog, DialogTitle, DialogContent, DialogActions, Butt
 import BusinessIcon from '@mui/icons-material/Business';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import StarIcon from '@mui/icons-material/Star';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import PieChartIcon from '@mui/icons-material/PieChart';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
 import DownloadIcon from '@mui/icons-material/Download';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import InfoIcon from '@mui/icons-material/Info';
+import * as XLSX from 'xlsx';
 import { api } from '../api';
 import { useI18n } from '../i18n/translator';
 import '../styles/layout.css';
@@ -75,6 +77,53 @@ const CompaniesPanel = () => {
     setIsFormOpen(true);
   };
 
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [bulkUploading, setBulkUploading] = React.useState(false);
+  const [, setPreviewOpen] = React.useState(false);
+
+  const sanitizeCode = (name: any, fallback = 'COMP') => {
+    const seed = String(name || '').toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    if (seed) return seed.slice(0, 10);
+    return `${fallback}-${Math.floor(1000 + Math.random() * 9000)}`;
+  };
+
+  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBulkUploading(true);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const json: any[] = XLSX.utils.sheet_to_json(sheet);
+
+      const requiredColumns = ['name', 'code', 'unite'];
+      if (json.length > 0) {
+        const firstRowKeys = Object.keys(json[0]).map((k) => String(k).trim().toLowerCase());
+        const missing = requiredColumns.filter((col) => !firstRowKeys.includes(col));
+        if (missing.length > 0) {
+          alert(t('Upload aborted. Please fix the following errors in your Excel file:\n\n') + `Missing required columns: ${missing.join(', ')}`);
+          return;
+        }
+      }
+
+      const payload = json.map((r: any) => ({
+        name: r.name,
+        code: (r.code || '').toString().trim() || sanitizeCode(r.name, 'COMP'),
+        unite: r.unite,
+      }));
+
+      const res = await api.post('/companies/bulk_create/', payload);
+      alert(res.data.message || t('Bulk upload successful!'));
+      void fetchCompanies();
+    } catch (err: any) {
+      alert(t('Bulk upload failed:') + ' ' + (err?.response?.data?.error || err?.message || t('Unknown error')));
+    } finally {
+      setBulkUploading(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
   const closeForm = () => {
     setIsFormOpen(false);
     setEditing(null);
@@ -128,6 +177,21 @@ const CompaniesPanel = () => {
           <button className="btn btn-primary" style={{ width: '100%' }} onClick={openNewForm}>
             <BusinessIcon fontSize="small" /> {t('Add Company')}
           </button>
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            ref={fileInputRef}
+            onChange={handleExcelUpload}
+            style={{ display: 'none' }}
+          />
+          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+            <button className="btn btn-outline" onClick={() => setPreviewOpen(true)} style={{ padding: '8px 12px' }}>
+              <InfoIcon fontSize="small" />
+            </button>
+            <button className="btn btn-outline" onClick={() => fileInputRef.current?.click()} disabled={bulkUploading}>
+              <UploadFileIcon fontSize="small" /> {bulkUploading ? t('Uploading...') : t('Bulk Upload')}
+            </button>
+          </div>
         </div>
         <div className="card">
           <div className="card-title">
@@ -402,6 +466,53 @@ const GradesPanel = () => {
     setIsFormOpen(true);
   };
 
+  const gradeFileInputRef = React.useRef<HTMLInputElement>(null);
+  const [gradeBulkUploading, setGradeBulkUploading] = React.useState(false);
+  const [, setGradePreviewOpen] = React.useState(false);
+
+  const handleGradesExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setGradeBulkUploading(true);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const json: any[] = XLSX.utils.sheet_to_json(sheet);
+
+      const requiredColumns = ['name', 'code', 'rating'];
+      if (json.length > 0) {
+        const firstRowKeys = Object.keys(json[0]).map((k) => String(k).trim().toLowerCase());
+        const missing = requiredColumns.filter((col) => !firstRowKeys.includes(col));
+        if (missing.length > 0) {
+          alert(t('Upload aborted. Please fix the following errors in your Excel file:\n\n') + `Missing required columns: ${missing.join(', ')}`);
+          return;
+        }
+      }
+
+      const sanitizeGradeCode = (name: any, fallback = 'GRD') => {
+        const seed = String(name || '').toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        if (seed) return seed.slice(0, 10);
+        return `${fallback}-${Math.floor(1000 + Math.random() * 9000)}`;
+      };
+
+      const payload = json.map((r: any) => ({
+        name: r.name,
+        code: (r.code || '').toString().trim() || sanitizeGradeCode(r.name, 'GRD'),
+        rating: r.rating,
+      }));
+
+      const res = await api.post('/grades/bulk_create/', payload);
+      alert(res.data.message || t('Bulk upload successful!'));
+      void fetchGrades();
+    } catch (err: any) {
+      alert(t('Bulk upload failed:') + ' ' + (err?.response?.data?.error || err?.message || t('Unknown error')));
+    } finally {
+      setGradeBulkUploading(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
   const closeForm = () => {
     setIsFormOpen(false);
     setEditing(null);
@@ -449,6 +560,21 @@ const GradesPanel = () => {
           <button className="btn btn-primary" style={{ width: '100%' }} onClick={openNewForm}>
             <StarIcon fontSize="small" /> {t('Add Grade')}
           </button>
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            ref={gradeFileInputRef}
+            onChange={handleGradesExcelUpload}
+            style={{ display: 'none' }}
+          />
+          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+            <button className="btn btn-outline" onClick={() => setGradePreviewOpen(true)} style={{ padding: '8px 12px' }}>
+              <InfoIcon fontSize="small" />
+            </button>
+            <button className="btn btn-outline" onClick={() => gradeFileInputRef.current?.click()} disabled={gradeBulkUploading}>
+              <UploadFileIcon fontSize="small" /> {gradeBulkUploading ? t('Uploading...') : t('Bulk Upload')}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -511,7 +637,7 @@ const GradesPanel = () => {
 const QuotasPanel = () => {
   const { t } = useI18n();
   const [quotas, setQuotas] = useState<any[]>([]);
-  const [years, setYears] = useState<{ id: number; year: number }[]>([]);
+  const [, setYears] = useState<{ id: number; year: number }[]>([]);
   const [unites, setUnites] = useState<{ id: number; name: string }[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);

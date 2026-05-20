@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, Snackbar } from '@mui/material';
+import { Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button, Snackbar, Tooltip, Typography, Table, TableHead, TableRow, TableCell, TableBody, Autocomplete, TextField } from '@mui/material';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import EditIcon from '@mui/icons-material/Edit';
@@ -8,8 +8,10 @@ import DownloadIcon from '@mui/icons-material/Download';
 import PersonAddAlt1Icon from '@mui/icons-material/PersonAddAlt1';
 import SearchIcon from '@mui/icons-material/Search';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import InfoIcon from '@mui/icons-material/Info';
 import { getJobs } from '../api-jobs';
 import { useI18n } from '../i18n/translator';
+import { getErrorMessage } from '../utils/errorHandler';
 import '../styles/layout.css';
 
 interface Assignment {
@@ -29,7 +31,7 @@ const AssignmentsPage = () => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [persons, setPersons] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
-  const [companies, setCompanies] = useState<any[]>([]);
+  const [, setCompanies] = useState<any[]>([]);
   const [allJobs, setAllJobs] = useState<any[]>([]);
   const [filter, setFilter] = useState('');
   
@@ -47,6 +49,7 @@ const AssignmentsPage = () => {
   const [bulkUploading, setBulkUploading] = useState(false);
   const [warningOpen, setWarningOpen] = useState(false);
   const [warningMsg, setWarningMsg] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
   const selectedPerson = persons.find(p => String(p.id) === String(form.person));
 
   const normalizeText = (value: any) => String(value ?? '').trim().toLowerCase();
@@ -61,9 +64,10 @@ const AssignmentsPage = () => {
     
     if (filter) params.search = filter;
     if (personFilter) params.person = personFilter;
-    if (jobFilter) params.job = jobFilter;
+    if (jobFilter) params.job__name = jobFilter;
     if (contractTypeFilter) params.person__contract_type = contractTypeFilter;
     
+    // Add pending assignments specifically if we need to see them
     const res = await axios.get('/api/assignments/', { params });
     setAssignments(res.data.results || res.data);
   };
@@ -174,6 +178,7 @@ const AssignmentsPage = () => {
   const formatContractType = (value: string) => {
     if (value === 'actif') return t('Active');
     if (value === 'contractuel') return t('Contractual');
+    if (value === 'reserve') return t('Reserve');
     if (value === 'permanent') return t('Permanent');
     if (value === 'temporary') return t('Temporary');
     if (value === 'intern') return t('Intern');
@@ -246,56 +251,99 @@ const AssignmentsPage = () => {
         jobsByName.set(key, current);
       });
 
-      const missingPersons: string[] = [];
-      const missingJobs: string[] = [];
-      const payloads: Array<{ person: number; job: number }> = [];
+      const errors: string[] = [];
+      const payloads: Array<{ person: number; job: number; year: number }> = [];
+      const jobsToCreate = new Map<string, { payload: any, linkedPersons: number[] }>();
 
       rows.forEach((row, index) => {
         const rowNum = index + 2;
 
-        const matricule = row.matricule || row.Matricule;
-        const jobTitle = row['job title'] || row['Job Title'] || row.job_title || row.JobTitle;
-        const companyName = row.company || row.Company;
-        const uniteName = row.unite || row.Unite;
+        const matricule = normalizeText(row.matricule || row.Matricule);
+        let jobTitle = row['job title'] || row['Job Title'] || row.job_title || row.JobTitle;
+        if (typeof jobTitle === 'string') jobTitle = jobTitle.trim();
+        const companyName = normalizeText(row.company || row.Company);
+        const uniteName = normalizeText(row.unite || row.Unite);
 
-        const person = personByMatricule.get(normalizeText(matricule));
+        const person = personByMatricule.get(matricule);
         if (!person) {
-          missingPersons.push(`Row ${rowNum} (${matricule || '-'})`);
+          errors.push(`Row ${rowNum}: ${t('Person with matricule')} '${row.matricule || '-'}' ${t('does not exist')}.`);
           return;
+        }
+
+        const personCompanyName = normalizeText(person.company_name);
+        const personUniteName = normalizeText(person.unite_name);
+        
+        if (personCompanyName !== companyName || personUniteName !== uniteName) {
+           errors.push(`Row ${rowNum}: ${t('Mismatch')}. ${t('Person belongs to')} ${person.company_name || 'None'}/${person.unite_name || 'None'}, ${t('but Excel says')} ${row.company || 'None'}/${row.unite || 'None'}.`);
+           return;
         }
 
         const jobNameKey = normalizeText(jobTitle);
         const candidates = jobsByName.get(jobNameKey) || [];
-        const filteredByCompany = normalizeText(companyName)
-          ? candidates.filter((job) => normalizeText(job.company_name) === normalizeText(companyName))
-          : candidates;
-
-        const filteredByUnite = normalizeText(uniteName)
-          ? filteredByCompany.filter((job) => {
-              const matchCompany = companies.find((company) => String(company.id) === String(job.company));
-              return normalizeText(matchCompany?.unite_name || matchCompany?.unite || '') === normalizeText(uniteName)
-                || normalizeText(person.unite_name) === normalizeText(uniteName);
-            })
-          : filteredByCompany;
-
-        const selectedJob = filteredByUnite[0] || filteredByCompany[0] || candidates[0];
-        if (!selectedJob) {
-          missingJobs.push(`Row ${rowNum} (${jobTitle || '-'})`);
+        if (candidates.length === 0) {
+          errors.push(`Row ${rowNum}: ${t('Job title')} '${jobTitle}' ${t('does not exist anywhere in the system')}.`);
           return;
         }
 
-        payloads.push({
-          person: Number(person.id),
-          job: Number(selectedJob.id),
-        });
+        const personGradeId = Number(person.grade);
+        const exactJobInCompany = candidates.find(j => normalizeText(j.company_name) === personCompanyName);
+        
+        const jobReference = exactJobInCompany || candidates[0];
+        
+        let gradeAllowed = false;
+        if (exactJobInCompany) {
+            gradeAllowed = !exactJobInCompany.grades || exactJobInCompany.grades.length === 0 || exactJobInCompany.grades.includes(personGradeId);
+        } else {
+            gradeAllowed = candidates.some(j => !j.grades || j.grades.length === 0 || j.grades.includes(personGradeId));
+        }
+
+        if (!gradeAllowed) {
+            errors.push(`Row ${rowNum}: ${t('Grade mismatch')}. ${t('Grade')} '${person.grade_name || personGradeId}' ${t('is not allowed for job')} '${jobTitle}'.`);
+            return;
+        }
+
+        if (exactJobInCompany) {
+            payloads.push({
+                person: Number(person.id),
+                job: Number(exactJobInCompany.id),
+                year: new Date().getFullYear()
+            });
+        } else {
+            const cacheKey = `${person.company}-${jobNameKey}`;
+            if (!jobsToCreate.has(cacheKey)) {
+                jobsToCreate.set(cacheKey, {
+                    payload: {
+                        name: jobReference.name,
+                        company: person.company,
+                        code: `TED-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random()*10000)}`,
+                        max_workers: 0,
+                        is_in_quota: false,
+                        grades: jobReference.grades || []
+                    },
+                    linkedPersons: []
+                });
+            }
+            jobsToCreate.get(cacheKey)!.linkedPersons.push(Number(person.id));
+        }
       });
 
-      if (missingPersons.length || missingJobs.length) {
-        const warningLines: string[] = [];
-        if (missingPersons.length) warningLines.push(`${t('Missing person')}: ${missingPersons.join(', ')}`);
-        if (missingJobs.length) warningLines.push(`${t('Missing job')}: ${missingJobs.join(', ')}`);
-        openWarning(warningLines.join('\n'));
+      if (errors.length > 0) {
+        openWarning(t('Upload aborted. Please fix the following errors in your Excel file:\n\n') + errors.join('\n'));
         return;
+      }
+
+      // Create missing jobs
+      for (const [, item] of Array.from(jobsToCreate.entries())) {
+          try {
+              const res = await axios.post('/api/jobs/', item.payload);
+              const newJobId = res.data.id;
+              item.linkedPersons.forEach(personId => {
+                 payloads.push({ person: personId, job: newJobId, year: new Date().getFullYear() });
+              });
+          } catch (err: any) {
+              openWarning(`${t('Failed to create surplus job')}: ${item.payload.name}.`);
+              return;
+          }
       }
 
       const results = await Promise.allSettled(
@@ -304,10 +352,14 @@ const AssignmentsPage = () => {
 
       const failed = results.filter((result) => result.status === 'rejected') as PromiseRejectedResult[];
       if (failed.length > 0) {
-        openWarning(`${failed.length} row(s) failed to upload.`);
+        const errorMessages = failed.map(f => getErrorMessage(f.reason)).join('\n');
+        openWarning(`${failed.length} row(s) failed to upload.\nDetails:\n${errorMessages}`);
       }
 
       await fetchAssignments();
+      const p = await axios.get('/api/jobs/');
+      setAllJobs(p.data.results || p.data);
+
     } catch (error: any) {
       openWarning(error?.message || t('Unknown error'));
     } finally {
@@ -315,6 +367,9 @@ const AssignmentsPage = () => {
       e.target.value = '';
     }
   };
+
+  const pendingAssignments = assignments.filter(a => a.job_name.includes("En attente"));
+  const regularAssignments = assignments.filter(a => !a.job_name.includes("En attente"));
 
   return (
     <div className="assignments-page-container">
@@ -400,8 +455,8 @@ const AssignmentsPage = () => {
                 onChange={e => setJobFilter(e.target.value)}
               >
                 <option value="">{t('All Roles')}</option>
-                {allJobs.map(j => (
-                  <option key={j.id} value={j.id}>{j.name}</option>
+                {Array.from(new Set(allJobs.map(j => j.name as string))).sort().map(name => (
+                  <option key={name} value={name}>{name}</option>
                 ))}
               </select>
             </div>
@@ -415,6 +470,7 @@ const AssignmentsPage = () => {
                 <option value="">{t('All Types')}</option>
                 <option value="actif">{t('Active')}</option>
                 <option value="contractuel">{t('Contractual')}</option>
+                <option value="reserve">{t('Reserve')}</option>
               </select>
             </div>
           </div>
@@ -435,8 +491,11 @@ const AssignmentsPage = () => {
               ref={fileInputRef}
               onChange={handleExcelUpload}
               style={{ display: 'none' }}
-            />
-            <button
+            />            <Tooltip title={t('View Expected Excel Format')}>
+              <button className="btn btn-outline" onClick={() => setPreviewOpen(true)} style={{ padding: '8px 12px' }}>
+                <InfoIcon fontSize="small" />
+              </button>
+            </Tooltip>            <button
               className="btn btn-outline"
               onClick={() => fileInputRef.current?.click()}
               disabled={bulkUploading}
@@ -461,7 +520,7 @@ const AssignmentsPage = () => {
             </tr>
           </thead>
           <tbody>
-            {assignments.map((a, i) => (
+            {regularAssignments.map((a, i) => (
               <tr key={a.id}>
                 <td>
                   <div className="resource-cell">
@@ -498,12 +557,71 @@ const AssignmentsPage = () => {
                 </td>
               </tr>
             ))}
-            {assignments.length === 0 && (
+            {regularAssignments.length === 0 && (
               <tr><td colSpan={6} style={{ textAlign: 'center', padding: '32px' }}>{t('No assignments found.')}</td></tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {pendingAssignments.length > 0 && (
+        <div className="card" style={{ marginTop: '24px', borderTop: '4px solid orange' }}>
+          <div className="table-header-row">
+            <div>
+              <h2 className="card-title" style={{marginBottom: '4px', color: 'orange'}}>{t('Pending Assignments')}</h2>
+              <p className="card-subtitle" style={{margin: 0}}>{pendingAssignments.length} {t('employees awaiting final job placement')}</p>
+            </div>
+          </div>
+
+          <table className="custom-table" style={{ borderTop: '1px solid #eaeaea' }}>
+            <thead>
+              <tr>
+                <th>{t('Resource Name')}</th>
+                <th>{t('Company (Pool)')}</th>
+                <th>{t('Pending Status')}</th>
+                <th>{t('Assign Job')}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {pendingAssignments.map((a, i) => (
+                <tr key={a.id}>
+                  <td>
+                    <div className="resource-cell">
+                      <div className={getAvatarClass(i)}>{getInitials(a.person_name)}</div>
+                      <div className="info-block">
+                        <h4>{a.person_name}</h4>
+                        <p>ID: EMP-{a.person}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="info-block">
+                      <h4>{a.company_name}</h4>
+                      <p>{a.unite_name || '-'}</p>
+                    </div>
+                  </td>
+                  <td>
+                    <span className="status-pill temporary" style={{ backgroundColor: '#fff3cd', color: '#b56b00', border: '1px solid #ffe69c' }}>
+                      {a.job_name}
+                    </span>
+                  </td>
+                  <td>
+                    <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }} onClick={() => handleEdit(a)}>
+                      {t('Configure Mapping')}
+                    </button>
+                  </td>
+                  <td>
+                    <div className="action-icons">
+                      <button className="action-btn delete" onClick={() => handleDelete(a.id)}><DeleteIcon fontSize="small" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Custom Creation/Edit Modal */}
       {isFormOpen && (
@@ -513,19 +631,46 @@ const AssignmentsPage = () => {
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label>{t('Person')}</label>
-                <select value={form.person} onChange={e => setForm(f => ({ ...f, person: e.target.value, job: '' }))} required>
-                  <option value="" disabled>{t('Select Employee...')}</option>
-                  {persons.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}</option>)}
-                </select>
+                <Autocomplete
+                  options={persons}
+                  getOptionLabel={(p) => `${p.first_name} ${p.last_name} - ${p.matricule || p.national_id || ''}`}
+                  value={persons.find(p => String(p.id) === String(form.person)) || null}
+                  onChange={(_, newValue) => {
+                    setForm(f => ({ ...f, person: newValue ? String(newValue.id) : '', job: '' }));
+                  }}
+                  renderInput={(params) => (
+                    <TextField 
+                      {...params} 
+                      placeholder={t('Select Employee...')} 
+                      required 
+                      variant="outlined" 
+                      size="small" 
+                      sx={{ backgroundColor: 'white', borderRadius: '4px' }}
+                    />
+                  )}
+                />
               </div>
-              <div className="form-group">
+              <div className="form-group" style={{ marginTop: '16px' }}>
                 <label>{t('Job Role')}</label>
-                <select value={form.job} onChange={e => setForm(f => ({ ...f, job: e.target.value }))} required disabled={!selectedPerson || jobs.length === 0}>
-                  <option value="" disabled>
-                    {selectedPerson ? (jobs.length === 0 ? t('No jobs for this company') : t('Select Job...')) : t('Select a person first')}
-                  </option>
-                  {jobs.map(j => <option key={j.id} value={j.id}>{j.name}</option>)}
-                </select>
+                <Autocomplete
+                  options={jobs}
+                  getOptionLabel={(j) => j.name}
+                  value={jobs.find(j => String(j.id) === String(form.job)) || null}
+                  onChange={(_, newValue) => {
+                    setForm(f => ({ ...f, job: newValue ? String(newValue.id) : '' }));
+                  }}
+                  disabled={!selectedPerson || jobs.length === 0}
+                  renderInput={(params) => (
+                    <TextField 
+                      {...params} 
+                      placeholder={selectedPerson ? (jobs.length === 0 ? t('No jobs for this company') : t('Select Job...')) : t('Select a person first')} 
+                      required 
+                      variant="outlined" 
+                      size="small" 
+                      sx={{ backgroundColor: 'white', borderRadius: '4px' }}
+                    />
+                  )}
+                />
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={closeForm}>{t('Cancel')}</button>
@@ -536,6 +681,51 @@ const AssignmentsPage = () => {
         </div>
       )}
 
+      <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>{t('Expected Excel Format for Assignments')}</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" gutterBottom>
+            {t('Ensure your Excel file has a heading row matching these exact column names. Additional columns will be ignored.')}
+          </Typography>
+          <div style={{ overflowX: 'auto' }}>
+            <Table size="small" sx={{ mt: 2, minWidth: 600 }}>
+              <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableRow>
+                  <TableCell><strong>first_name</strong></TableCell>
+                  <TableCell><strong>last_name</strong></TableCell>
+                  <TableCell><strong>matricule</strong></TableCell>
+                  <TableCell><strong>job title</strong></TableCell>
+                  <TableCell><strong>company</strong></TableCell>
+                  <TableCell><strong>unite</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                <TableRow>
+                  <TableCell>John</TableCell>
+                  <TableCell>Doe</TableCell>
+                  <TableCell>200417000522</TableCell>
+                  <TableCell>Senior Developer</TableCell>
+                  <TableCell>Headquarters</TableCell>
+                  <TableCell>Regiment</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Jane</TableCell>
+                  <TableCell>Smith</TableCell>
+                  <TableCell>201302010795</TableCell>
+                  <TableCell>Director</TableCell>
+                  <TableCell>Alpha Company</TableCell>
+                  <TableCell>Regiment</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPreviewOpen(false)} variant="contained" color="primary">
+            {t('Close')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };

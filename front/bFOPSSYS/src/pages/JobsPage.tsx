@@ -24,6 +24,7 @@ interface Job {
   grades: number[]; 
   accepted_grades_info?: { id: number; name: string }[]; 
   max_workers: number;
+  is_in_quota: boolean;
   created_at: string;
 }
 
@@ -41,12 +42,13 @@ const JobsPage = () => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [grades, setGrades] = useState<{ id: number; name: string }[]>([]);
   const [filter, setFilter] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
   const [editing, setEditing] = useState<Job | null>(null);
   const [formError, setFormError] = useState('');
   const [newCompany, setNewCompany] = useState({ name: '', code: '' });
   const [maxWorkersByCompany, setMaxWorkersByCompany] = useState<Record<string, string>>({});
   
-  const initialFormState = { name: '', code: '', companies: [] as string[], grades: [] as string[], max_workers: '' };
+  const initialFormState = { name: '', code: '', companies: [] as string[], grades: [] as string[], max_workers: '', is_in_quota: true };
   const [form, setForm] = useState(initialFormState);
   
   const [bulkUploading, setBulkUploading] = useState(false);
@@ -54,7 +56,9 @@ const JobsPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchJobs = async () => {
-    const params = filter ? { search: filter } : undefined;
+    const params: any = {};
+    if (filter) params.search = filter;
+    if (companyFilter) params.company = companyFilter;
     const res = await axios.get('/api/jobs/', { params });
     setJobs(res.data.results || res.data); 
   };
@@ -73,7 +77,7 @@ const JobsPage = () => {
     fetchJobs(); 
     fetchCompanies(); 
     fetchGrades(); 
-  }, [filter]);
+  }, [filter, companyFilter]);
 
   const getApiErrorMessage = (err: any) => {
     const details = err?.response?.data;
@@ -141,29 +145,44 @@ const JobsPage = () => {
 
       json.forEach((row, index) => {
         const rowNum = index + 2;
-        
-        let companyId: number | null = null;
-        let rawCompany = row.company || row.Company;
+
+        const getVal = (possibleKeys: string[]) => {
+          const keys = Object.keys(row);
+          for (const k of keys) {
+            if (possibleKeys.includes(k.trim().toLowerCase())) {
+              return row[k];
+            }
+          }
+          return '';
+        };
+
+        const normalize = (str: any) => String(str).replace(/\s+/g, '').toLowerCase();
+
+        let companyIds: number[] = [];
+        let rawCompany = getVal(['company']);
         if (rawCompany != null && rawCompany !== '') {
-          const c = companies.find(c => 
-            String(c.name).trim().toLowerCase() === String(rawCompany).trim().toLowerCase() || 
-            String(c.id) === String(rawCompany)
-          );
-          if (c) {
-            companyId = c.id;
-          } else {
-            errors.push(`Row ${rowNum}: Company "${rawCompany}" not found.`);
+          const names = String(rawCompany).split(',').map(s => s.trim()).filter(Boolean);
+          for (const name of names) {
+            const c = companies.find(c => 
+              normalize(c.name) === normalize(name) || 
+              String(c.id) === String(name)
+            );
+            if (c) {
+              companyIds.push(c.id);
+            } else {
+              errors.push(`Row ${rowNum}: Company "${name}" not found.`);
+            }
           }
         }
 
         let gradesIds: number[] = [];
-        let rawGrades = row.grades || row.Grades;
+        let rawGrades = getVal(['grades', 'grade']);
         if (rawGrades != null && rawGrades !== '') {
           const names = String(rawGrades).split(',').map(s => s.trim()).filter(Boolean);
           for (const name of names) {
             const g = grades.find(g => 
-              String(g.name).trim().toLowerCase() === name.toLowerCase() || 
-              String(g.id) === name
+              normalize(g.name) === normalize(name) || 
+              String(g.id) === String(name)
             );
             if (g) {
               gradesIds.push(g.id);
@@ -173,19 +192,48 @@ const JobsPage = () => {
           }
         }
 
-        const providedCode = String(row.code || row.Code || '').trim();
-        const generatedBaseCode = deriveBaseCodeFromName(String(row.name || row.Name || ''));
-        const generatedCode = companyId
-          ? buildUniqueJobCode(generatedBaseCode, companyId, reservedCodes)
-          : buildUniqueCode(generatedBaseCode, reservedCodes);
+        const rawCode = getVal(['code']);
+        let providedCodes = String(rawCode).split(',').map(x => x.trim()).filter(Boolean);
+        
+        const rawMaxWorkers = getVal(['max_workers', 'maxworkers', 'max workers']);
+        let maxWorkersList = String(rawMaxWorkers).split(',').map(x => x.trim()).filter(Boolean);
 
-        records.push({
-          name: row.name || row.Name || '',
-          code: providedCode || generatedCode,
-          company: companyId || '',
-          grades: gradesIds,
-          max_workers: row.max_workers || row.MaxWorkers || row['Max Workers'] || '',
-        });
+        const rawIsInQuota = getVal(['is_in_quota', 'isinquota', 'in quota']);
+        let isInQuota = true;
+        if (rawIsInQuota !== undefined && rawIsInQuota !== '') {
+          const str = String(rawIsInQuota).toLowerCase().trim();
+          isInQuota = !(str === 'false' || str === 'no' || str === '0');
+        }
+
+        const rawNameStr = String(getVal(['name'])).trim();
+        const generatedBaseCode = deriveBaseCodeFromName(rawNameStr);
+
+        // If no companies were found/provided, we still push a record (it will lack a company, backend might reject if company is required)
+        if (companyIds.length === 0) {
+           const generatedCode = buildUniqueCode(generatedBaseCode, reservedCodes);
+           records.push({
+             name: rawNameStr,
+             code: providedCodes[0] || generatedCode,
+             company: '',
+             grades: gradesIds,
+             max_workers: maxWorkersList[0] || '1',
+             is_in_quota: isInQuota,
+           });
+        } else {
+           companyIds.forEach((cId, i) => {
+             const theCode = providedCodes[i] || providedCodes[0] || buildUniqueJobCode(generatedBaseCode, cId, reservedCodes);
+             const theMaxWorker = maxWorkersList[i] || maxWorkersList[0] || '1';
+
+             records.push({
+               name: rawNameStr,
+               code: theCode,
+               company: cId,
+               grades: gradesIds,
+               max_workers: theMaxWorker,
+               is_in_quota: isInQuota,
+             });
+           });
+        }
       });
 
       if (errors.length > 0) {
@@ -254,6 +302,11 @@ const JobsPage = () => {
     const invalidMaxCompanyNames: string[] = [];
 
     selectedCompanyIds.forEach((companyId) => {
+      if (!form.is_in_quota) {
+        maxByCompany[companyId] = 0;
+        return;
+      }
+
       const overrideValue = maxWorkersByCompany[String(companyId)];
       const rawValue = (overrideValue ?? form.max_workers ?? '').trim();
       const parsedValue = Number(rawValue);
@@ -306,8 +359,9 @@ const JobsPage = () => {
           name: form.name,
           code: primaryCode,
           grades: form.grades.map(Number),
-          max_workers: maxByCompany[primaryCompanyId],
+          max_workers: form.is_in_quota ? maxByCompany[primaryCompanyId] : 0,
           company: primaryCompanyId,
+          is_in_quota: form.is_in_quota,
         };
         await axios.put(`/api/jobs/${editing.id}/`, payload);
 
@@ -318,8 +372,9 @@ const JobsPage = () => {
             name: form.name,
             code: jobCode,
             grades: form.grades.map(Number),
-            max_workers: maxByCompany[companyId],
+            max_workers: form.is_in_quota ? maxByCompany[companyId] : 0,
             company: companyId,
+            is_in_quota: form.is_in_quota,
           };
           await axios.post('/api/jobs/', extraPayload);
         }
@@ -339,8 +394,9 @@ const JobsPage = () => {
             name: form.name,
             code: jobCode,
             grades: form.grades.map(Number),
-            max_workers: maxByCompany[companyId],
+            max_workers: form.is_in_quota ? maxByCompany[companyId] : 0,
             company: companyId,
+            is_in_quota: form.is_in_quota,
           };
           await axios.post('/api/jobs/', payload);
         }
@@ -365,7 +421,8 @@ const JobsPage = () => {
       companies: [String(job.company)], 
       // Ensure we map the backend integers to strings for the HTML select
       grades: job.grades ? job.grades.map(String) : [], 
-      max_workers: String(job.max_workers) 
+      max_workers: String(job.max_workers),
+      is_in_quota: job.is_in_quota !== undefined ? job.is_in_quota : true
     });
   };
 
@@ -529,7 +586,16 @@ const JobsPage = () => {
                 </div>
                 <div className="form-group">
                   <label className="form-label">{t('Max Workers')}</label>
-                  <input type="number" className="form-input" placeholder="0" value={form.max_workers} onChange={e => setForm(f => ({ ...f, max_workers: e.target.value }))} required min="1" />
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    placeholder="0" 
+                    disabled={!form.is_in_quota}
+                    value={form.is_in_quota ? form.max_workers : 0} 
+                    onChange={e => setForm(f => ({ ...f, max_workers: e.target.value }))} 
+                    required={form.is_in_quota} 
+                    min={form.is_in_quota ? "1" : "0"} 
+                  />
                   <small style={{ color: '#6b7280' }}>
                     {t('Default value used when company-specific max is not set.')}
                   </small>
@@ -572,7 +638,7 @@ const JobsPage = () => {
                 )}
               </div>
 
-              {form.companies.filter(v => v !== ADD_COMPANY_OPTION).length > 0 && (
+              {form.companies.filter(v => v !== ADD_COMPANY_OPTION).length > 0 && form.is_in_quota && (
                 <div className="form-group">
                   <label className="form-label">{t('Max Workers Per Company')}</label>
                   <div style={{ display: 'grid', gap: '8px' }}>
@@ -594,8 +660,9 @@ const JobsPage = () => {
                             <input
                               type="number"
                               className="form-input"
-                              min="1"
-                              value={maxWorkersByCompany[companyId] ?? form.max_workers}
+                              min="0"
+                              disabled={!form.is_in_quota}
+                              value={form.is_in_quota ? (maxWorkersByCompany[companyId] ?? form.max_workers) : 0}
                               onChange={e => {
                                 const value = e.target.value;
                                 setMaxWorkersByCompany(prev => ({ ...prev, [companyId]: value }));
@@ -622,6 +689,18 @@ const JobsPage = () => {
                 </select>
               </div>
 
+              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <input 
+                  type="checkbox" 
+                  id="isInQuota" 
+                  checked={form.is_in_quota} 
+                  onChange={e => setForm(f => ({ ...f, is_in_quota: e.target.checked }))} 
+                />
+                <label htmlFor="isInQuota" style={{ margin: 0, color: '#374151' }}>
+                  {t('Include in quotes & statistics')}
+                </label>
+              </div>
+
               <button type="submit" className="btn btn-primary btn-full-width">
                 {editing ? t('Update Registry') : t('Add to Registry')}
               </button>
@@ -641,11 +720,24 @@ const JobsPage = () => {
           <div className="card">
             <div className="table-top-bar">
               <div className="stats-pills">
-                <div className="stat-pill"><span className="dot"></span> {jobs.length} {t('TOTAL ROLES')}</div>
+                <div className="stat-pill">
+                  <span className="dot"></span> {jobs.length} {companyFilter ? t('ROLES IN SELECTED COMPANY') : t('TOTAL ROLES')}
+                </div>
                 <div className="stat-pill"><span className="dot"></span> {totalCapacity} {t('CAPACITY')}</div>
                 <div className="stat-pill"><span className="dot"></span> {sharedRolesByName.length} {t('SHARED NAMES')}</div>
               </div>
-              <div className="filter-wrapper">
+              <div className="filter-wrapper" style={{ display: 'flex', gap: '10px' }}>
+                <select 
+                  className="form-input" 
+                  value={companyFilter} 
+                  onChange={e => setCompanyFilter(e.target.value)}
+                  style={{ minWidth: '150px' }}
+                >
+                  <option value="">{t('All Companies')}</option>
+                  {companies.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
                 <input 
                   type="text" 
                   className="search-input" 
@@ -672,6 +764,7 @@ const JobsPage = () => {
                   <th>{t('Job Title & Code')}</th>
                   <th>{t('Required Grades')}</th>
                   <th>{t('Max Workers')}</th>
+                  <th>{t('In Quota')}</th>
                   <th>{t('Created At')}</th>
                   <th>{t('Actions')}</th>
                 </tr>
@@ -709,6 +802,19 @@ const JobsPage = () => {
                           </div>
                         </div>
                       </td>
+                      <td>
+                        {job.is_in_quota ? (
+                          <span style={{ 
+                            padding: '4px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', 
+                            backgroundColor: '#e8f5e9', color: '#2e7d32' 
+                          }}>{t('IN TED')}</span>
+                        ) : (
+                          <span style={{ 
+                            padding: '4px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', 
+                            backgroundColor: '#ffebee', color: '#c62828' 
+                          }}>{t('NOT TED')}</span>
+                        )}
+                      </td>
                       <td>{formatDate(job.created_at)}</td>
                       <td>
                         <div className="action-icons">
@@ -721,7 +827,7 @@ const JobsPage = () => {
                 })}
                 {jobs.length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: '32px', color: '#6b7280' }}>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '32px', color: '#6b7280' }}>
                       {t('No roles found matching your search.')}
                     </td>
                   </tr>
@@ -747,6 +853,7 @@ const JobsPage = () => {
                   <TableCell><strong>company</strong></TableCell>
                   <TableCell><strong>grades</strong></TableCell>
                   <TableCell><strong>max_workers</strong></TableCell>
+                  <TableCell><strong>is_in_quota</strong></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -756,6 +863,7 @@ const JobsPage = () => {
                   <TableCell>Company A</TableCell>
                   <TableCell>capitaine, commandant</TableCell>
                   <TableCell>5</TableCell>
+                  <TableCell>true</TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell>Project Manager</TableCell>
@@ -763,6 +871,7 @@ const JobsPage = () => {
                   <TableCell>HQ</TableCell>
                   <TableCell>lieutenant</TableCell>
                   <TableCell>2</TableCell>
+                  <TableCell>false</TableCell>
                 </TableRow>
               </TableBody>
             </Table>

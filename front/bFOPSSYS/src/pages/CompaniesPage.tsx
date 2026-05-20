@@ -1,10 +1,27 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Typography,
+  Tooltip,
+} from '@mui/material';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import BusinessIcon from '@mui/icons-material/Business';
 import SearchIcon from '@mui/icons-material/Search';
 import DownloadIcon from '@mui/icons-material/Download';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import InfoIcon from '@mui/icons-material/Info';
 import { useI18n } from '../i18n/translator';
 import '../styles/layout.css'; // Shared CSS
 
@@ -26,6 +43,9 @@ const CompaniesPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<Company | null>(null);
   const [form, setForm] = useState({ name: '', code: '', unite: '' });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const safeCompanies = Array.isArray(companies) ? companies : [];
 
@@ -80,6 +100,77 @@ const CompaniesPage = () => {
     }
   };
 
+  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBulkUploading(true);
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const json: any[] = XLSX.utils.sheet_to_json(sheet);
+
+      const requiredColumns = ['name', 'code', 'unite'];
+      if (json.length > 0) {
+        const firstRowKeys = Object.keys(json[0]).map((k) => String(k).trim().toLowerCase());
+        const missing = requiredColumns.filter((col) => !firstRowKeys.includes(col));
+        if (missing.length > 0) {
+          alert(t('Upload aborted. Please fix the following errors in your Excel file:\n\n') + `Missing required columns: ${missing.join(', ')}`);
+          return;
+        }
+      }
+
+      const records: any[] = [];
+      const errors: string[] = [];
+      const normalize = (value: any) => String(value || '').replace(/\s+/g, '').toLowerCase();
+
+      json.forEach((row, index) => {
+        const rowNum = index + 2;
+        const getVal = (possibleKeys: string[]) => {
+          const keys = Object.keys(row);
+          for (const k of keys) {
+            if (possibleKeys.includes(k.trim().toLowerCase())) {
+              return row[k];
+            }
+          }
+          return '';
+        };
+
+        const name = String(getVal(['name'])).trim();
+        const code = String(getVal(['code'])).trim();
+        const uniteRaw = getVal(['unite']);
+        const uniteMatch = unites.find((u) => normalize(u.name) === normalize(uniteRaw) || String(u.id) === String(uniteRaw).trim());
+
+        if (!name) errors.push(`Row ${rowNum}: Company name is required.`);
+        if (!uniteMatch) errors.push(`Row ${rowNum}: Unite "${uniteRaw}" does not exist.`);
+
+        const sanitizedCode = String(code || '').trim() || (name ? String(name).toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0,10) : `COMP-${Math.floor(1000+Math.random()*9000)}`);
+        records.push({
+          name,
+          code: sanitizedCode,
+          unite: uniteMatch?.id,
+        });
+      });
+
+      if (errors.length > 0) {
+        alert(t('Upload aborted. Please fix the following errors in your Excel file:\n\n') + errors.join('\n'));
+        return;
+      }
+
+      const res = await axios.post('/api/companies/bulk_create/', records);
+      const payload = res.data || {};
+      const details = payload.errors ? `\n\n${(payload.errors as string[]).join('\n')}` : '';
+      alert((payload.message || t('Bulk upload successful!')) + details);
+      fetchCompanies();
+    } catch (err: any) {
+      alert(t('Bulk upload failed:') + ' ' + (err?.response?.data?.error || err?.message || t('Unknown error')));
+    } finally {
+      setBulkUploading(false);
+      e.target.value = '';
+    }
+  };
+
   return (
     <div className="assignments-page-container">
       <header className="page-header">
@@ -100,6 +191,24 @@ const CompaniesPage = () => {
           <button className="btn btn-primary" style={{ width: '100%' }} onClick={openNewForm}>
             <BusinessIcon fontSize="small" /> {t('Add Company')}
           </button>
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            ref={fileInputRef}
+            onChange={handleExcelUpload}
+            style={{ display: 'none' }}
+          />
+          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+            <Tooltip title={t('View Expected Excel Format')}>
+              <button className="btn btn-outline" onClick={() => setPreviewOpen(true)} style={{ padding: '8px 12px' }}>
+                <InfoIcon fontSize="small" />
+              </button>
+            </Tooltip>
+            <button className="btn btn-outline" onClick={() => fileInputRef.current?.click()} disabled={bulkUploading}>
+              <UploadFileIcon fontSize="small" />
+              {bulkUploading ? t('Uploading...') : t('Bulk Upload')}
+            </button>
+          </div>
         </div>
         <div className="card">
           <div className="card-title">
@@ -164,7 +273,7 @@ const CompaniesPage = () => {
               </div>
               <div className="form-group">
                 <label>{t('Company Code')}</label>
-                <input type="text" className="filter-select" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} required />
+                <input type="text" className="filter-select" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder={t('Leave blank for auto generation')} />
               </div>
               <div className="form-group">
                 <label>{t('Unite')}</label>
@@ -181,6 +290,39 @@ const CompaniesPage = () => {
           </div>
         </div>
       )}
+
+      <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{t('Expected Excel Format for Companies')}</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" gutterBottom>
+            {t('Ensure your Excel file has a heading row matching these exact column names. If code cell is empty, it will be auto-generated.')}
+          </Typography>
+          <Table size="small" sx={{ mt: 2, border: '1px solid #ddd' }}>
+            <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+              <TableRow>
+                <TableCell><strong>name</strong></TableCell>
+                <TableCell><strong>code</strong></TableCell>
+                <TableCell><strong>unite</strong></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              <TableRow>
+                <TableCell>Compagnie 1</TableCell>
+                <TableCell>C1</TableCell>
+                <TableCell>Bataillon</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>Compagnie 2</TableCell>
+                <TableCell></TableCell>
+                <TableCell>Regiment</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPreviewOpen(false)}>{t('Close')}</Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };

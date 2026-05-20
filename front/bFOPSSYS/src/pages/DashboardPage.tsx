@@ -1,5 +1,25 @@
-import { useEffect, useState } from 'react';
-import { Box, Typography, MenuItem, Select, FormControl, InputLabel, Paper } from '@mui/material';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Box,
+  Typography,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
+} from '@mui/material';
 import axios from 'axios';
 import { Bar, Pie } from 'react-chartjs-2';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
@@ -24,9 +44,13 @@ const DashboardPage = () => {
   const [unites, setUnites] = useState<Unite[]>([]);
   const [allCompanies, setAllCompanies] = useState<any[]>([]);
   const [allJobs, setAllJobs] = useState<any[]>([]);
+  const [allPersons, setAllPersons] = useState<any[]>([]);
+  const [allAssignments, setAllAssignments] = useState<any[]>([]);
   
   const [jobStats, setJobStats] = useState<any[]>([]);
   const [companyStats, setCompanyStats] = useState<any[]>([]);
+  const [selectedTedStatus, setSelectedTedStatus] = useState<'ted' | 'not_ted' | null>(null);
+  const [tedDetailsOpen, setTedDetailsOpen] = useState(false);
 
   // Persist filters to session storage when they change
   useEffect(() => {
@@ -40,6 +64,8 @@ const DashboardPage = () => {
     axios.get('/api/unites/').then(res => setUnites(res.data.results || res.data));
     axios.get('/api/companies/').then(res => setAllCompanies(res.data.results || res.data));
     axios.get('/api/jobs/').then(res => setAllJobs(res.data.results || res.data));
+    axios.get('/api/persons/').then(res => setAllPersons(res.data.results || res.data));
+    axios.get('/api/assignments/').then(res => setAllAssignments(res.data.results || res.data));
   }, []);
 
   useEffect(() => {
@@ -119,6 +145,96 @@ const DashboardPage = () => {
       };
     });
   }
+
+  const scopeJobs = useMemo(() => {
+    let jobs = [...allJobs];
+
+    if (unite) {
+      const validCompanyIds = filteredCompanies.map((c: any) => String(c.id));
+      jobs = jobs.filter((job: any) => validCompanyIds.includes(String(job.company)));
+    }
+
+    if (company) {
+      jobs = jobs.filter((job: any) => String(job.company) === String(company));
+    }
+
+    if (selectedJob !== 'all') {
+      jobs = jobs.filter((job: any) => String(job.id) === String(selectedJob));
+    }
+
+    return jobs;
+  }, [allJobs, company, filteredCompanies, selectedJob, unite]);
+
+  const latestAssignmentsByPerson = useMemo(() => {
+    const normalizedYear = yearId.trim() === '' ? null : Number(yearId);
+    const yearFilter = Number.isFinite(normalizedYear) ? normalizedYear : null;
+    const latestByPerson = new Map<number, any>();
+
+    allAssignments.forEach((assignment) => {
+      const assignmentYear = assignment.year_value == null ? null : Number(assignment.year_value);
+      if (yearFilter !== null && assignmentYear !== null && assignmentYear > yearFilter) {
+        return;
+      }
+
+      const personId = Number(assignment.person);
+      const current = latestByPerson.get(personId);
+      if (!current) {
+        latestByPerson.set(personId, assignment);
+        return;
+      }
+
+      const currentTime = new Date(current.created_at || 0).getTime();
+      const nextTime = new Date(assignment.created_at || 0).getTime();
+      if (nextTime > currentTime || (nextTime === currentTime && Number(assignment.id) > Number(current.id))) {
+        latestByPerson.set(personId, assignment);
+      }
+    });
+
+    return latestByPerson;
+  }, [allAssignments, yearId]);
+
+  const tedJobsCount = scopeJobs.filter((job: any) => job.is_in_quota).length;
+  const notTedJobsCount = scopeJobs.filter((job: any) => !job.is_in_quota).length;
+
+  const tedJobIdSet = useMemo(() => new Set(scopeJobs.map((job: any) => String(job.id))), [scopeJobs]);
+  const jobById = useMemo(() => {
+    const map = new Map<number, any>();
+    allJobs.forEach((job: any) => map.set(Number(job.id), job));
+    return map;
+  }, [allJobs]);
+
+  const tedPersonRows = useMemo(() => {
+    return allPersons
+      .map((person) => {
+        const latestAssignment = latestAssignmentsByPerson.get(Number(person.id));
+        if (!latestAssignment) return null;
+
+        if (!tedJobIdSet.has(String(latestAssignment.job))) {
+          return null;
+        }
+
+        const job = jobById.get(Number(latestAssignment.job));
+        if (!job) return null;
+
+        const isTed = Boolean(job.is_in_quota);
+        if (selectedTedStatus === 'ted' && !isTed) return null;
+        if (selectedTedStatus === 'not_ted' && isTed) return null;
+
+        return {
+          id: person.id,
+          person_name: `${person.first_name || ''} ${person.last_name || ''}`.trim(),
+          matricule: person.matricule || person.national_id || '-',
+          grade_name: person.grade_name || '-',
+          contract_type: person.contract_type || '-',
+          job_name: latestAssignment.job_name || job.name || '-',
+          company_name: latestAssignment.company_name || job.company_name || '-',
+          unite_name: latestAssignment.unite_name || '-',
+          assignment_year: latestAssignment.year_value ?? '-',
+          ted_label: isTed ? t('TED') : t('NOT TED'),
+        };
+      })
+      .filter(Boolean);
+  }, [allPersons, jobById, latestAssignmentsByPerson, selectedTedStatus, tedJobIdSet, t]);
 
   const handleJobPieClick = (_event: any, elements: any) => {
     if (!elements.length) return;
@@ -239,6 +355,50 @@ const DashboardPage = () => {
     },
   };
 
+  const tedJobsBarData = {
+    labels: [t('TED'), t('NOT TED')],
+    datasets: [
+      {
+        label: t('Jobs'),
+        data: [tedJobsCount, notTedJobsCount],
+        backgroundColor: ['#1976d2', '#ef6c00'],
+        borderRadius: 10,
+        barPercentage: 0.55,
+        categoryPercentage: 0.55,
+      },
+    ],
+  };
+
+  const handleTedJobsBarClick = (_event: any, elements: any) => {
+    if (!elements.length) return;
+    const selectedIndex = elements[0].index;
+    setSelectedTedStatus(selectedIndex === 0 ? 'ted' : 'not_ted');
+    setTedDetailsOpen(true);
+  };
+
+  const tedJobsBarOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      datalabels: {
+        display: true,
+        color: '#1f2937',
+        font: { weight: 'bold' as const },
+        formatter: (value: number) => value,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          precision: 0,
+        },
+      },
+    },
+    onClick: handleTedJobsBarClick,
+  };
+
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, width: '100%' }}>
       <Typography variant="h4" fontWeight="bold" color="primary.main" gutterBottom sx={{ mb: 4 }}>
@@ -350,6 +510,77 @@ const DashboardPage = () => {
           </Grid>
         </Grid>
       )}
+
+      <Grid container spacing={3} sx={{ mt: 2 }}>
+        <Grid size={{ xs: 12 }}>
+          <Paper elevation={2} sx={{ p: 3, borderRadius: 2 }}>
+            <Typography variant="h6" fontWeight="medium" mb={1}>
+              {t('TED vs NOT TED Jobs')}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              {t('Click a bar to inspect the people assigned to jobs in that category.')}
+            </Typography>
+            <Box sx={{ height: 320 }}>
+              <Bar data={tedJobsBarData} options={tedJobsBarOptions} />
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      <Dialog open={tedDetailsOpen} onClose={() => setTedDetailsOpen(false)} maxWidth="xl" fullWidth>
+        <DialogTitle>
+          {selectedTedStatus === 'ted' ? t('TED Job Details') : t('NOT TED Job Details')}
+        </DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+            <Chip label={`${t('Jobs')}: ${selectedTedStatus === 'ted' ? tedJobsCount : notTedJobsCount}`} color="primary" variant="outlined" />
+            <Chip label={`${t('Persons')}: ${tedPersonRows.length}`} color="secondary" variant="outlined" />
+          </Box>
+
+          <TableContainer sx={{ maxHeight: 560 }}>
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell>{t('Person')}</TableCell>
+                  <TableCell>{t('Matricule')}</TableCell>
+                  <TableCell>{t('Grade')}</TableCell>
+                  <TableCell>{t('Contract')}</TableCell>
+                  <TableCell>{t('Job')}</TableCell>
+                  <TableCell>{t('Company')}</TableCell>
+                  <TableCell>{t('Unite')}</TableCell>
+                  <TableCell>{t('Year')}</TableCell>
+                  <TableCell>{t('TED Status')}</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {tedPersonRows.map((row: any) => (
+                  <TableRow key={row.id} hover>
+                    <TableCell>{row.person_name}</TableCell>
+                    <TableCell>{row.matricule}</TableCell>
+                    <TableCell>{row.grade_name}</TableCell>
+                    <TableCell>{row.contract_type}</TableCell>
+                    <TableCell>{row.job_name}</TableCell>
+                    <TableCell>{row.company_name}</TableCell>
+                    <TableCell>{row.unite_name}</TableCell>
+                    <TableCell>{row.assignment_year}</TableCell>
+                    <TableCell>{row.ted_label}</TableCell>
+                  </TableRow>
+                ))}
+                {tedPersonRows.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={9} align="center">
+                      {t('No persons found for the selected TED status.')}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTedDetailsOpen(false)}>{t('Close')}</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
